@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.1.2](https://github.com/Battlegrounds-Development/bunker/compare/v1.1.1...v1.1.2) (2026-03-27)
+
+
+### Bug Fixes
+
+* .versionrc should update pom.xml now ([be8a556](https://github.com/Battlegrounds-Development/bunker/commit/be8a5562d1068c989882d63ad9bd5bbf57193ea0))
+
 ### [1.1.1](https://github.com/Battlegrounds-Development/bunker/compare/v1.1.0...v1.1.1) (2026-03-25)
 
 ## 1.1.0 (2026-02-20)
