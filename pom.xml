@@ -39,7 +39,6 @@
                         </goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
-                            <outputFile>C:\Users\TheRe\Desktop\Bunker_1.2-SNAPSHOT.jar</outputFile>
                         </configuration>
                     </execution>
                 </executions>

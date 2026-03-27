@@ -1,4 +1,5 @@
 {
+  "header": "# Changelog\n",
   "packageFiles": [
     {
       "filename": "pom.xml",
