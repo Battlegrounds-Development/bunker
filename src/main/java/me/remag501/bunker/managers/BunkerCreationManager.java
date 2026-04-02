@@ -1,6 +1,6 @@
 package me.remag501.bunker.managers;
 
-import me.remag501.bgscore.api.task.TaskService;
+import me.remag501.core.api.task.TaskService;
 import me.remag501.bunker.BunkerPlugin;
 import me.remag501.bunker.core.BunkerInstance;
 import me.remag501.bunker.service.*;

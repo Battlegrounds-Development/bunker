@@ -1,10 +1,10 @@
 package me.remag501.bunker;
 
 import com.sk89q.worldguard.WorldGuard;
-import me.remag501.bgscore.api.BGSApi;
-import me.remag501.bgscore.api.command.CommandService;
-import me.remag501.bgscore.api.event.EventService;
-import me.remag501.bgscore.api.task.TaskService;
+import me.remag501.core.api.BGSApi;
+import me.remag501.core.api.command.CommandService;
+import me.remag501.core.api.event.EventService;
+import me.remag501.core.api.task.TaskService;
 import me.remag501.bunker.commands.BunkerAdminCommand;
 import me.remag501.bunker.commands.BunkerCommand;
 //import me.remag501.bunker.commands.BunkerCommandOld;

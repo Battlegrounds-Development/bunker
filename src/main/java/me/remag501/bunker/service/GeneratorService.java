@@ -3,7 +3,7 @@ package me.remag501.bunker.service;
 import com.muhammaddaffa.nextgens.NextGens;
 import com.muhammaddaffa.nextgens.generators.ActiveGenerator;
 import com.muhammaddaffa.nextgens.generators.Generator;
-import me.remag501.bgscore.api.task.TaskService;
+import me.remag501.core.api.task.TaskService;
 import me.remag501.bunker.core.BunkerInstance;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;

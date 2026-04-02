@@ -3,7 +3,7 @@ package me.remag501.bunker.listeners;
 import com.artillexstudios.axvaults.AxVaults;
 import com.artillexstudios.axvaults.guis.VaultSelector;
 import com.artillexstudios.axvaults.vaults.VaultManager;
-import me.remag501.bgscore.api.event.EventService;
+import me.remag501.core.api.event.EventService;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.World;

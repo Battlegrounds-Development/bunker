@@ -1,7 +1,7 @@
 package me.remag501.bunker.listeners;
 
 import com.muhammaddaffa.nextgens.api.events.generators.GeneratorBreakEvent;
-import me.remag501.bgscore.api.event.EventService;
+import me.remag501.core.api.event.EventService;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
