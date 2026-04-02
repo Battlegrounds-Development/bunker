@@ -8,9 +8,10 @@ import org.bukkit.*;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.mvplugins.multiverse.core.MultiverseCoreApi;
+import org.mvplugins.multiverse.core.world.LoadedMultiverseWorld;
 import org.mvplugins.multiverse.core.world.MultiverseWorld;
 import org.mvplugins.multiverse.core.world.WorldManager;
-import org.mvplugins.multiverse.core.world.options.CreateWorldOptions;
+import org.mvplugins.multiverse.core.world.options.CloneWorldOptions;
 
 import java.util.HashSet;
 import java.util.List;
@@ -165,22 +166,45 @@ public class BunkerCreationManager {
     public void createBunkerWorld(String worldName) {
         logger.info("Initializing creation for: " + worldName);
         BunkerInstance bunkerInstance = bunkerConfigManager.getBunkerInstance("main");
+        String templateWorldName = bunkerConfigManager.getTemplateWorldName();
+        logger.info("Using template world: " + templateWorldName);
+
+        if (templateWorldName == null || templateWorldName.isBlank()) {
+            logger.severe("Config key 'templateWorldName' is missing or empty. Cannot clone bunker world: " + worldName);
+            return;
+        }
 
         MultiverseCoreApi mvApi = MultiverseCoreApi.get();
         WorldManager worldManager = mvApi.getWorldManager();
 
-        // 1. Create the world if it doesn't exist
+        // 1. Clone the world from the configured template if it doesn't exist
         if (worldManager.getWorld(worldName).isEmpty()) {
-            CreateWorldOptions options = CreateWorldOptions.worldName(worldName)
-                    .environment(World.Environment.NORMAL)
-                    .worldType(WorldType.FLAT)
-                    .generator("VoidGen")
-                    .generateStructures(false);
+            var templateLoadedWorld = worldManager.getLoadedWorld(templateWorldName);
+            if (templateLoadedWorld.isEmpty()) {
+                var loadResult = worldManager.loadWorld(templateWorldName);
+                if (loadResult.isFailure()) {
+                    logger.severe("Template world '" + templateWorldName + "' is not loaded and failed to load: " + loadResult.getFailureReason());
+                    return;
+                }
+                templateLoadedWorld = worldManager.getLoadedWorld(templateWorldName);
+            }
 
-            var result = worldManager.createWorld(options);
+            if (templateLoadedWorld.isEmpty()) {
+                logger.severe("Template world '" + templateWorldName + "' was not found in Multiverse. Cannot clone " + worldName);
+                return;
+            }
+
+            LoadedMultiverseWorld sourceWorld = templateLoadedWorld.get();
+            CloneWorldOptions options = CloneWorldOptions.fromTo(sourceWorld, worldName)
+                    .keepGameRule(true)
+                    .keepWorldBorder(true)
+                    .keepWorldConfig(true)
+                    .saveBukkitWorld(true);
+
+            var result = worldManager.cloneWorld(options);
 
             if (result.isFailure()) {
-                logger.severe("Multiverse failed to create " + worldName + ": " + result.getFailureReason());
+                logger.severe("Multiverse failed to clone " + worldName + " from template '" + templateWorldName + "': " + result.getFailureReason());
                 return;
             }
         }
@@ -192,6 +216,7 @@ public class BunkerCreationManager {
             World world = Bukkit.getWorld(worldName);
 
             if (world != null) {
+                // Base world is already copied from template; skip main schematic paste here.
                 setupWorldContent(world, bunkerInstance);
                 return true; // Stop the task
             }
@@ -235,9 +260,6 @@ public class BunkerCreationManager {
 
                 // 3. WorldGuard Phase
                 worldGuardService.setupBunkerFlags(world);
-
-                // 4. Schematic Phase
-                schematicService.addSchematic(bunkerInstance, worldName);
 
                 // 5. Citizens/Hologram Phase
                 npcService.addNPC(worldName, bunkerInstance);

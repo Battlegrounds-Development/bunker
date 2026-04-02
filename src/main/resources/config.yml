@@ -22,6 +22,10 @@ bunkerPurchased: "You have successfully purchased a bunker!"
 
 # Adjust properties of the bunker
 
+# Global source world used when creating bunker worlds.
+# Each bunker_X world is cloned from this template instead of generating a void world.
+templateWorldName: "bunker_template"
+
 # schematics can be found in bunker/schematics, you have to create the folder if it doesn't exist.
 schematicName: "bunker.schem"
 # Schematic coordinate location
@@ -49,3 +53,16 @@ main:
     x: 0.0
     y: 0.0
     z: 0.0
+
+farm:
+  schematics:
+    - name: "farm.schem"
+      coords: {x: 40, y: 0, z: 0}
+
+  holograms:
+    - name: "test_moved"
+      type: "test"
+      coords: {x: 0, y: 2, z: -6}
+
+  remove-holograms:
+    - "test"
