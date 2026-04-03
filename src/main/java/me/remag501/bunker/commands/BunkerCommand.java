@@ -3,7 +3,7 @@ package me.remag501.bunker.commands;
 import me.remag501.bunker.BunkerPlugin;
 import me.remag501.bunker.managers.BunkerCreationManager;
 import me.remag501.bunker.managers.BunkerConfigManager;
-import org.bukkit.Location;
+import me.remag501.bunker.service.BunkerWorldLifecycleService;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -14,11 +14,14 @@ public class BunkerCommand implements CommandExecutor {
     private final BunkerPlugin plugin;
     private final BunkerConfigManager bunkerConfigManager;
     private final BunkerCreationManager bunkerCreationManager;
+    private final BunkerWorldLifecycleService worldLifecycleService;
 
-    public BunkerCommand(BunkerPlugin plugin, BunkerConfigManager bunkerConfigManager, BunkerCreationManager bunkerCreationManager) {
+    public BunkerCommand(BunkerPlugin plugin, BunkerConfigManager bunkerConfigManager, BunkerCreationManager bunkerCreationManager,
+                         BunkerWorldLifecycleService worldLifecycleService) {
         this.plugin = plugin;
         this.bunkerConfigManager = bunkerConfigManager;
         this.bunkerCreationManager = bunkerCreationManager;
+        this.worldLifecycleService = worldLifecycleService;
     }
 
     @Override
@@ -34,20 +37,24 @@ public class BunkerCommand implements CommandExecutor {
             return true;
 
         if (args.length == 0 || args[0].equalsIgnoreCase("home")) {
-            // Teleport to own bunker
+            // Teleport to own bunker after ensuring the slime world is loaded.
             if (!bunkerCreationManager.hasBunker(player.getUniqueId())) {
                 player.sendMessage(bunkerConfigManager.getMessage("noBunker"));
                 return true;
             }
+
             String worldName = bunkerCreationManager.getWorldName(player.getUniqueId());
-            World bunkerWorld = plugin.getServer().getWorld(worldName);
-            if (bunkerWorld == null) {
+            if (worldName == null || worldName.isBlank()) {
                 player.sendMessage("Bunker world not found!");
                 return true;
             }
-            Location loc = bunkerWorld.getSpawnLocation();
-            player.teleport(loc);
-            player.sendMessage(bunkerConfigManager.getMessage("homeMsg"));
+
+            worldLifecycleService.executeWhenWorldLoaded(worldName,
+                    world -> {
+                        player.teleport(world.getSpawnLocation());
+                        player.sendMessage(bunkerConfigManager.getMessage("homeMsg"));
+                    },
+                    () -> player.sendMessage("Bunker world not found!"));
             return true;
         }
 
@@ -67,7 +74,7 @@ public class BunkerCommand implements CommandExecutor {
 //            case "visit":
 //                player.sendMessage("This command is temporarily removed");
 //                return true;
-
+//
 //            case "accept":
 //                if (!visitRequestManager.hasPendingRequest(player.getUniqueId())) {
 //                    player.sendMessage("You have no pending visit requests.");
@@ -105,5 +112,4 @@ public class BunkerCommand implements CommandExecutor {
                 return true;
         }
     }
-
 }
