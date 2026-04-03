@@ -1,5 +1,6 @@
 package me.remag501.bunker.managers;
 
+import com.infernalsuite.asp.api.AdvancedSlimePaperAPI;
 import me.remag501.core.api.task.TaskService;
 import me.remag501.bunker.BunkerPlugin;
 import me.remag501.bunker.core.BunkerInstance;
@@ -8,10 +9,9 @@ import org.bukkit.*;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.mvplugins.multiverse.core.MultiverseCoreApi;
-import org.mvplugins.multiverse.core.world.LoadedMultiverseWorld;
 import org.mvplugins.multiverse.core.world.MultiverseWorld;
 import org.mvplugins.multiverse.core.world.WorldManager;
-import org.mvplugins.multiverse.core.world.options.CloneWorldOptions;
+import org.mvplugins.multiverse.core.world.options.CreateWorldOptions;
 
 import java.util.HashSet;
 import java.util.List;
@@ -174,39 +174,14 @@ public class BunkerCreationManager {
             return;
         }
 
-        MultiverseCoreApi mvApi = MultiverseCoreApi.get();
-        WorldManager worldManager = mvApi.getWorldManager();
+        boolean createdWithAsp = tryCreateAspWorld(worldName, templateWorldName);
+        if (!createdWithAsp && !createLegacyWorld(worldName)) {
+            return;
+        }
+        final boolean applyBaseSchematics = !createdWithAsp;
 
-        // 1. Clone the world from the configured template if it doesn't exist
-        if (worldManager.getWorld(worldName).isEmpty()) {
-            var templateLoadedWorld = worldManager.getLoadedWorld(templateWorldName);
-            if (templateLoadedWorld.isEmpty()) {
-                var loadResult = worldManager.loadWorld(templateWorldName);
-                if (loadResult.isFailure()) {
-                    logger.severe("Template world '" + templateWorldName + "' is not loaded and failed to load: " + loadResult.getFailureReason());
-                    return;
-                }
-                templateLoadedWorld = worldManager.getLoadedWorld(templateWorldName);
-            }
-
-            if (templateLoadedWorld.isEmpty()) {
-                logger.severe("Template world '" + templateWorldName + "' was not found in Multiverse. Cannot clone " + worldName);
-                return;
-            }
-
-            LoadedMultiverseWorld sourceWorld = templateLoadedWorld.get();
-            CloneWorldOptions options = CloneWorldOptions.fromTo(sourceWorld, worldName)
-                    .keepGameRule(true)
-                    .keepWorldBorder(true)
-                    .keepWorldConfig(true)
-                    .saveBukkitWorld(true);
-
-            var result = worldManager.cloneWorld(options);
-
-            if (result.isFailure()) {
-                logger.severe("Multiverse failed to clone " + worldName + " from template '" + templateWorldName + "': " + result.getFailureReason());
-                return;
-            }
+        if (!createdWithAsp) {
+            logger.info("Falling back to legacy Multiverse/VoidGen creation for " + worldName);
         }
 
         // 2. Wait for the world to be loaded using TaskService
@@ -216,8 +191,7 @@ public class BunkerCreationManager {
             World world = Bukkit.getWorld(worldName);
 
             if (world != null) {
-                // Base world is already copied from template; skip main schematic paste here.
-                setupWorldContent(world, bunkerInstance);
+                setupWorldContent(world, bunkerInstance, applyBaseSchematics);
                 return true; // Stop the task
             }
 
@@ -232,17 +206,51 @@ public class BunkerCreationManager {
         });
     }
 
-    public void setupWorldContent(World world, BunkerInstance bunkerInstance) {
+    private boolean tryCreateAspWorld(String worldName, String templateWorldName) {
+        try {
+            AdvancedSlimePaperAPI api = AdvancedSlimePaperAPI.instance();
+            var templateWorld = api.getLoadedWorld(templateWorldName);
+            if (templateWorld == null) {
+                logger.warning("ASP template world '" + templateWorldName + "' is not loaded.");
+                return false;
+            }
+
+            var clonedWorld = templateWorld.getSerializableCopy().clone(worldName);
+            api.loadWorld(clonedWorld, false);
+            return true;
+        } catch (Throwable t) {
+            logger.warning("ASP bunker world creation failed for '" + worldName + "': " + t.getMessage());
+            return false;
+        }
+    }
+
+    private boolean createLegacyWorld(String worldName) {
+        MultiverseCoreApi mvApi = MultiverseCoreApi.get();
+        WorldManager worldManager = mvApi.getWorldManager();
+
+        if (worldManager.getWorld(worldName).isEmpty()) {
+            CreateWorldOptions options = CreateWorldOptions.worldName(worldName)
+                    .environment(World.Environment.NORMAL)
+                    .worldType(WorldType.FLAT)
+                    .generator("VoidGen")
+                    .generateStructures(false);
+
+            var result = worldManager.createWorld(options);
+            if (result.isFailure()) {
+                logger.severe("Multiverse failed to create " + worldName + ": " + result.getFailureReason());
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public void setupWorldContent(World world, BunkerInstance bunkerInstance, boolean applyBaseSchematics) {
         String worldName = world.getName();
         MultiverseCoreApi mvApi = MultiverseCoreApi.get();
 
         WorldManager worldManager = mvApi.getWorldManager();
         MultiverseWorld mvWorld = worldManager.getWorld(world).getOrNull();
 
-        // 1. Core Bukkit/MV Settings (Safe to do immediately)
-        applyWorldSettings(world, mvWorld);
-
-        // 2. Wait for the World to be "Ready"
         // We target the spawn chunk. When this completes, the world is ticked and WorldGuard
         // will have recognized the new world instance.
 
@@ -250,22 +258,28 @@ public class BunkerCreationManager {
         int chunkX = spawn.getBlockX() >> 4;
         int chunkZ = spawn.getBlockZ() >> 4;
 
-        // 1. Force the chunk to load and STAY loaded during setup
+        // Force the chunk to load and STAY loaded during setup
         world.setChunkForceLoaded(chunkX, chunkZ, true);
 
-        // 2. Use the standard getChunkAtAsync or simply a small delay
-        // Now that it's force-loaded, the callback WILL fire.
+        // Use the standard getChunkAtAsync with a small delay
         world.getChunkAtAsync(spawn).thenAccept(chunk -> {
             taskService.delay(1, () -> { // Give it 1 tick to stabilize
 
-                // 3. WorldGuard Phase
+                // 1. Apply settings first
+                applyWorldSettings(world, mvWorld);
+
+                if (applyBaseSchematics) {
+                    schematicService.addSchematic(bunkerInstance, worldName);
+                }
+
+                // 2. WorldGuard Phase
                 worldGuardService.setupBunkerFlags(world);
 
-                // 5. Citizens/Hologram Phase
+                // 3. Citizens/Hologram Phase
                 npcService.addNPC(worldName, bunkerInstance);
                 hologramService.addHologram(bunkerInstance, world);
 
-                // 6. Cleanup: Unforce the chunk so we don't leak memory with 100 worlds
+                // 4. Cleanup: Unforce the chunk so we don't leak memory with 100 worlds
                 world.setChunkForceLoaded(chunkX, chunkZ, false);
 
                 logger.info("Successfully initialized all systems for " + worldName);

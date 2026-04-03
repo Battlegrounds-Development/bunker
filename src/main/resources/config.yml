@@ -26,33 +26,30 @@ bunkerPurchased: "You have successfully purchased a bunker!"
 # Each bunker_X world is cloned from this template instead of generating a void world.
 templateWorldName: "bunker_template"
 
-# schematics can be found in bunker/schematics, you have to create the folder if it doesn't exist.
-schematicName: "bunker.schem"
-# Schematic coordinate location
+spawn:
+  x: 0
+  y: 0
+  z: 0
+  yaw: 0
+  pitch: 0
+
 main:
-  schematicCoords:
-    x: 0
-    y: 0
-    z: 0
-  spawnCoords:
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    yaw: 0.0
-    pitch: 0.0
-  npcID: 0
-  npcCoords:
-    x: 0.0
-    y: 0.0
-    z: 0.0
-    yaw: 0.0
-    pitch: 0.0
-  generatorType: "stone"
-  generatorLevel: 1
-  generatorCoords:
-    x: 0.0
-    y: 0.0
-    z: 0.0
+  schematics:
+    - name: "bunker.schem"
+      coords: {x: 0, y: 0, z: 0}
+
+  npcs:
+    - id: 25
+      coords: {x: 3, y: 0, z: -5, yaw: 90, pitch: 90}
+
+  generators:
+    - type: "ores_generator"
+      coords: {x: -6, y: 1, z: 0}
+
+  holograms:
+    -  name: "test"
+       type: "test"
+       coords: {x: 3, y: 3, z: 3}
 
 farm:
   schematics:

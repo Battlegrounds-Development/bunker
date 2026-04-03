@@ -1,5 +1,6 @@
 package me.remag501.bunker.managers;
 
+import com.infernalsuite.asp.api.AdvancedSlimePaperAPI;
 import me.remag501.bunker.core.BunkerInstance;
 import me.remag501.bunker.service.GeneratorService;
 import me.remag501.bunker.service.HologramService;
@@ -60,35 +61,12 @@ public class AdminManager {
 
             // Delete all holograms in a world
             for (BunkerInstance.HologramInfo hologramInfo : bunkerInstance.getHolograms()) {
-                hologramService.removeHologram("bunker_preview" + hologramInfo.name);
+                hologramService.removeHologram("bunker_preview_" + hologramInfo.name);
             }
 
             // No generator deletion?
 
-            // World deletion
-            MultiverseCoreApi mvApi = MultiverseCoreApi.get();
-            WorldManager worldManager = mvApi.getWorldManager();
-            String worldName = "bunker_preview";
-
-            // 1. Get the Option
-            var worldOption = worldManager.getWorld(worldName);
-
-            // 2. Use isPresent() to check
-            if (worldOption.isDefined()) {
-                // 3. Extract the MultiverseWorld and pass it to the builder
-                MultiverseWorld mvWorld = worldOption.get();
-
-                DeleteWorldOptions options = DeleteWorldOptions.
-                        world(mvWorld);
-
-                var result = worldManager.deleteWorld(options);
-
-                if (result.isSuccess()) {
-                    player.sendMessage(ChatColor.GRAY + "Deleted old preview world...");
-                }
-            }
-
-            player.sendMessage(ChatColor.GRAY + "Deleted old preview world...");
+            deletePreviewWorld(previewWorld, player);
         }
 
         // Create the new preview world asynchronously then teleport player when done
@@ -119,6 +97,38 @@ public class AdminManager {
                 complete = true;
             }
         }.runTaskTimer(plugin, 0L, 0L);
+    }
+
+    private void deletePreviewWorld(World previewWorld, Player player) {
+        String worldName = previewWorld.getName();
+
+        try {
+            var slimeWorld = AdvancedSlimePaperAPI.instance().getLoadedWorld(worldName);
+            if (slimeWorld != null) {
+                Bukkit.unloadWorld(previewWorld, false);
+                slimeWorld.getLoader().deleteWorld(worldName);
+                player.sendMessage(ChatColor.GRAY + "Deleted old preview world...");
+                return;
+            }
+        } catch (Throwable t) {
+            plugin.getLogger().warning("ASP preview delete failed for " + worldName + ": " + t.getMessage());
+        }
+
+        MultiverseCoreApi mvApi = MultiverseCoreApi.get();
+        WorldManager worldManager = mvApi.getWorldManager();
+        var worldOption = worldManager.getWorld(worldName);
+
+        if (worldOption.isDefined()) {
+            MultiverseWorld mvWorld = worldOption.get();
+            DeleteWorldOptions options = DeleteWorldOptions.world(mvWorld);
+            var result = worldManager.deleteWorld(options);
+            if (result.isSuccess()) {
+                player.sendMessage(ChatColor.GRAY + "Deleted old preview world...");
+                return;
+            }
+        }
+
+        player.sendMessage(ChatColor.GRAY + "Deleted old preview world...");
     }
 
 }
