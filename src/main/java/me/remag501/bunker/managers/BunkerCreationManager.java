@@ -50,9 +50,10 @@ public class BunkerCreationManager {
 
     // ---------------- Bunker Assignment & Config Access ----------------
 
-    public boolean hasBunker(String playerName) {
-        return bunkerConfig.getConfig().contains(playerName.toUpperCase() + ".id");
+    public boolean hasBunker(UUID playerId) {
+        return bunkerConfig.getConfig().contains(getPlayerBasePath(playerId) + ".world");
     }
+
     public void reloadBunkerConfig() {
         bunkerConfig.reload(); // reloads from disk
     }
@@ -76,44 +77,76 @@ public class BunkerCreationManager {
 
     public boolean upgradeBunker(Player player, String bunkerLevel) {
         // Update bunker config to show upgrades
-        String playerName = player.getName();
-        List<String> upgrades = bunkerConfig.getConfig().getStringList(playerName.toUpperCase() + ".upgrades");
+        UUID playerId = player.getUniqueId();
+        String upgradesPath = getPlayerBasePath(playerId) + ".upgrades";
+        List<String> upgrades = bunkerConfig.getConfig().getStringList(upgradesPath);
         if (!upgrades.contains(bunkerLevel)) {
             upgrades.add(bunkerLevel);
-            bunkerConfig.getConfig().set(playerName.toUpperCase() + ".upgrades", upgrades);
+            bunkerConfig.getConfig().set(upgradesPath, upgrades);
             bunkerConfig.save();
-        } else
+        } else {
             return false;
+        }
+
         // Get world and upgrade bunker
-        String worldName = getWorldName(playerName);
+        String worldName = getWorldName(playerId);
+        if (worldName == null || worldName.isBlank()) {
+            return false;
+        }
+
         World world = Bukkit.getWorld(worldName);
+        if (world == null) {
+            return false;
+        }
+
         return upgradeBunkerWorld(world, bunkerLevel, player);
     }
 
-    public boolean assignBunker(String playerName) {
+    public boolean assignBunker(Player player) {
+        UUID playerId = player.getUniqueId();
+
         // Check if own bunker or if enough exists
-        if (hasBunker(playerName)) return false;
-        // Enough should exist
+        if (hasBunker(playerId)) {
+            return false;
+        }
+
         int assigned = getAssignedBunkers();
         int total = getTotalBunkers();
-//        Bukkit.getPlayer(playerName).sendMessage("reached " + assigned + " " + total);
-        if (assigned >= total) return false;
+        if (assigned >= total) {
+            return false;
+        }
+
+        String worldName = "bunker_" + assigned;
 
         // Update the config
         bunkerConfig.getConfig().set("assignedBunkers", assigned + 1);
-        bunkerConfig.getConfig().set(playerName.toUpperCase() + ".id", assigned);
+        bunkerConfig.getConfig().set(getPlayerBasePath(playerId) + ".world", worldName + ".slime");
         bunkerConfig.save();
 
         // Add generators to bunker (needs to belong to player)
         BunkerInstance bunkerInstance = bunkerConfigManager.getBunkerInstance("main");
-        World world = Bukkit.getWorld(getWorldName(playerName));
-        generatorService.createGenerator(Bukkit.getPlayer(playerName), world, bunkerInstance);
+        World world = Bukkit.getWorld(worldName);
+        generatorService.createGenerator(player, world, bunkerInstance);
 
         return true;
     }
 
-    public String getWorldName(String playerName) {
-        return "bunker_" + bunkerConfig.getConfig().getString(playerName.toUpperCase()+".id");
+    public String getWorldName(UUID playerId) {
+        String storedWorldName = bunkerConfig.getConfig().getString(getPlayerBasePath(playerId) + ".world");
+        return normalizeStoredWorldName(storedWorldName);
+    }
+
+    private String getPlayerBasePath(UUID playerId) {
+        return playerId.toString();
+    }
+
+    private String normalizeStoredWorldName(String storedWorldName) {
+        if (storedWorldName == null || storedWorldName.isBlank()) {
+            return null;
+        }
+        return storedWorldName.endsWith(".slime")
+                ? storedWorldName.substring(0, storedWorldName.length() - 6)
+                : storedWorldName;
     }
 
     // ---------------- Bunker World Creation ----------------

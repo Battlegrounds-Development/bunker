@@ -1,9 +1,13 @@
-# File stores information the plugin to keep track of the bunker and is not meant to be edited
+# File stores runtime bunker ownership state. It is not meant to be edited manually.
+#
+# WARNING: Editing this file incorrectly can result in lost bunker assignments.
+#
+# Schema:
+# totalBunkers: <int>
+# assignedBunkers: <int>
+# <player-uuid>:
+#   world: bunker_<id>.slime
+#   upgrades: ["farm", "level2"]
 
-# WARNING: DO NOT TAMPER WITH CONTENTS OF THIS FILE UNLESS YOU KNOW WHAT YOU ARE DOING
-# EDITING THIS FILE CAN RESULT IN THE LOST OF PLAYER'S BUNKERS
-
-# Number of bunkers
-# Player name: bunker_id
 totalBunkers: 0
 assignedBunkers: 0

@@ -29,24 +29,22 @@ public class BunkerCommand implements CommandExecutor {
         }
 
         Player player = (Player) sender;
-        String playerName = player.getName();
 
         if (!player.hasPermission("bunker.use"))
             return true;
 
         if (args.length == 0 || args[0].equalsIgnoreCase("home")) {
             // Teleport to own bunker
-            if (!bunkerCreationManager.hasBunker(playerName)) {
+            if (!bunkerCreationManager.hasBunker(player.getUniqueId())) {
                 player.sendMessage(bunkerConfigManager.getMessage("noBunker"));
                 return true;
             }
-            String worldName = bunkerCreationManager.getWorldName(playerName);
+            String worldName = bunkerCreationManager.getWorldName(player.getUniqueId());
             World bunkerWorld = plugin.getServer().getWorld(worldName);
             if (bunkerWorld == null) {
                 player.sendMessage("Bunker world not found!");
                 return true;
             }
-            // Teleport logic, e.g., to spawn or configured coords
             Location loc = bunkerWorld.getSpawnLocation();
             player.teleport(loc);
             player.sendMessage(bunkerConfigManager.getMessage("homeMsg"));
@@ -55,11 +53,11 @@ public class BunkerCommand implements CommandExecutor {
 
         switch (args[0].toLowerCase()) {
             case "buy":
-                if (bunkerCreationManager.hasBunker(playerName)) {
+                if (bunkerCreationManager.hasBunker(player.getUniqueId())) {
                     player.sendMessage(bunkerConfigManager.getMessage("alreadyOwnBunker"));
                     return true;
                 }
-                if (bunkerCreationManager.assignBunker(playerName)) {
+                if (bunkerCreationManager.assignBunker(player)) {
                     player.sendMessage(bunkerConfigManager.getMessage("bunkerPurchased"));
                 } else {
                     player.sendMessage(bunkerConfigManager.getMessage("outOfBunkers"));

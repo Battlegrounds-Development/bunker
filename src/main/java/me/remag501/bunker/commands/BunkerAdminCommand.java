@@ -138,14 +138,14 @@ public class BunkerAdminCommand implements CommandExecutor {
                 }
 
                 String targetPlayer = args[1];
-                if (!bunkerCreationManager.hasBunker(targetPlayer)) {
-                    sender.sendMessage(ChatColor.RED + "Targeted player does not have a bunker!");
-                    return true;
-                }
-
                 Player player = Bukkit.getPlayer(targetPlayer);
                 if (player == null) {
                     sender.sendMessage(ChatColor.RED + "Targeted player is offline!");
+                    return true;
+                }
+
+                if (!bunkerCreationManager.hasBunker(player.getUniqueId())) {
+                    sender.sendMessage(ChatColor.RED + "Targeted player does not have a bunker!");
                     return true;
                 }
 
