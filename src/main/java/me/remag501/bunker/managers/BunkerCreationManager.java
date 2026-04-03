@@ -136,6 +136,28 @@ public class BunkerCreationManager {
         return normalizeStoredWorldName(storedWorldName);
     }
 
+    public List<String> getKnownBunkerWorldNames() {
+        List<String> worldNames = new java.util.ArrayList<>();
+
+        for (String key : bunkerConfig.getConfig().getKeys(false)) {
+            if (key.equalsIgnoreCase("totalBunkers") || key.equalsIgnoreCase("assignedBunkers")) {
+                continue;
+            }
+
+            String worldName = bunkerConfig.getConfig().getString(key + ".world");
+            if (worldName == null || worldName.isBlank()) {
+                continue;
+            }
+
+            String normalized = normalizeStoredWorldName(worldName);
+            if (normalized != null && !normalized.isBlank() && !worldNames.contains(normalized)) {
+                worldNames.add(normalized);
+            }
+        }
+
+        return worldNames;
+    }
+
     private String getPlayerBasePath(UUID playerId) {
         return playerId.toString();
     }

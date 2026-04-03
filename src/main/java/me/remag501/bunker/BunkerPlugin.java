@@ -63,8 +63,9 @@ public final class BunkerPlugin extends JavaPlugin {
         BunkerCommand command = new BunkerCommand(this, bunkerConfigManager, bunkerCreationManager, worldLifecycleService);
         getCommand("bunker").setExecutor(command);
         commandService.registerSubcommand("bunker", command);
-        BunkerAdminCommand adminCommand = new BunkerAdminCommand(bunkerConfigManager, bunkerCreationManager, adminManager);
+        BunkerAdminCommand adminCommand = new BunkerAdminCommand(bunkerConfigManager, bunkerCreationManager, adminManager, worldLifecycleService);
         getCommand("bunkeradmin").setExecutor(adminCommand);
+        getCommand("bunkeradmin").setTabCompleter(adminCommand);
         commandService.registerSubcommand("bunkeradmin", adminCommand);
 
         // Send startup message

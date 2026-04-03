@@ -14,7 +14,7 @@ commands:
     permission: bunker.use
   bunkeradmin:
     description: Administrative management for bunkers.
-    usage: /bunkeradmin <args>
+    usage: /bunkeradmin <add|preview|migrate|upgrade|tp>
     aliases: [ba]
     permission: bunker.admin
 
