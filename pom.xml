@@ -103,6 +103,10 @@
             <id>intellectualsites-releases</id>
             <url>https://repo.intellectualsites.com/releases/</url>
         </repository>
+        <repository>
+            <id>is-releases</id>
+            <url>https://repo.infernalsuite.com/repository/maven-releases/</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -112,10 +116,17 @@
             <version>2.12.1</version>
             <scope>provided</scope>
         </dependency>
+
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
             <version>1.21.8-R0.1-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.infernalsuite.asp</groupId>
+            <artifactId>api</artifactId>
+            <version>4.1.0</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
