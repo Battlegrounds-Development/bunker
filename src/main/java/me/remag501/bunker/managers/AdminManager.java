@@ -14,10 +14,6 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.mvplugins.multiverse.core.MultiverseCoreApi;
-import org.mvplugins.multiverse.core.world.MultiverseWorld;
-import org.mvplugins.multiverse.core.world.WorldManager;
-import org.mvplugins.multiverse.core.world.options.DeleteWorldOptions;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -114,19 +110,6 @@ public class AdminManager {
             plugin.getLogger().warning("ASP preview delete failed for " + worldName + ": " + t.getMessage());
         }
 
-        MultiverseCoreApi mvApi = MultiverseCoreApi.get();
-        WorldManager worldManager = mvApi.getWorldManager();
-        var worldOption = worldManager.getWorld(worldName);
-
-        if (worldOption.isDefined()) {
-            MultiverseWorld mvWorld = worldOption.get();
-            DeleteWorldOptions options = DeleteWorldOptions.world(mvWorld);
-            var result = worldManager.deleteWorld(options);
-            if (result.isSuccess()) {
-                player.sendMessage(ChatColor.GRAY + "Deleted old preview world...");
-                return;
-            }
-        }
 
         player.sendMessage(ChatColor.GRAY + "Deleted old preview world...");
     }

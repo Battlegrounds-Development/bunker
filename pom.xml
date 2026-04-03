@@ -96,10 +96,6 @@
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
         <repository>
-            <id>mvplugins-repo</id>
-            <url>https://repo.mvplugins.org/releases/</url>
-        </repository>
-        <repository>
             <id>intellectualsites-releases</id>
             <url>https://repo.intellectualsites.com/releases/</url>
         </repository>
@@ -133,18 +129,6 @@
             <groupId>me.clip</groupId>
             <artifactId>placeholderapi</artifactId>
             <version>2.12.2</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mvplugins.multiverse.core</groupId>
-            <artifactId>multiverse-core</artifactId>
-            <version>5.5.2</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.local</groupId>
-            <artifactId>voidGen</artifactId>
-            <version>2.2.1</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

@@ -1,7 +1,7 @@
 # AGENTS.md - Bunker Plugin Development Guide
 
 ## Project Overview
-**BGSBunker** is a Spigot/Paper Minecraft plugin that manages pre-created bunker worlds for players via Multiverse Core. Players can purchase bunkers (assigned from pre-generated instances), customize with schematics/NPCs/generators, and visit each other's worlds. This is a performance-optimized approach that avoids real-time world generation lag.
+**BGSBunker** is a Spigot/Paper Minecraft plugin that manages pre-created bunker worlds for players via SlimeWorldManager / Advanced Slime Paper. Players can purchase bunkers (assigned from pre-generated instances), customize with schematics/NPCs/generators, and visit each other's worlds. This is a performance-optimized approach that avoids real-time world generation lag.
 
 ## Architecture & Data Flow
 
@@ -20,7 +20,7 @@
 ### Critical Design Pattern: Two-Config System
 - `config.yml` = **Template**: Admin-defined bunker blueprints with component coordinates
 - `bunkers.yml` = **Runtime State**: Which players own which bunker instances (ID-based, not template-based)
-- When player purchases bunker: Multiverse creates world from pre-generated template, BunkerCreationManager calls services to place schematics/NPCs/generators, updates `bunkers.yml`
+- When player purchases bunker: ASP clones the configured template world, BunkerCreationManager calls services to place schematics/NPCs/generators, updates `bunkers.yml`
 
 ## Key Files & Patterns
 
@@ -139,7 +139,7 @@ assignBunker(playerName)
 - Schematics pasted on main thread (WorldEdit limitation) but chunk loads are async
 
 ### External Plugin Integration Points
-- **Multiverse-Core**: CreateWorldOptions API; worlds managed by MultiverseWorld objects
+- **SlimeWorldManager / ASP**: template-world cloning + load/delete APIs; `AdvancedSlimePaperAPI.instance()` returns the world backend entry point
 - **WorldEdit**: SchematicService loads .schem files; uses `EditSession` + `ClipboardHolder`
 - **NextGens**: GeneratorService.createGenerator() → getGeneratorManager().registerGenerator()
 - **Citizens**: NPCService instantiates NPCs; IDs stored in config
@@ -224,7 +224,7 @@ mvn clean package
 
 ### Dependencies (All `provided` scope - must be on server)
 - **Paper API** 1.21.8 (core Bukkit/Spigot)
-- **Multiverse-Core** 5.5.2
+- **SlimeWorldManager / ASP** 4.1.0
 - **FastAsyncWorldEdit** 2.12.3 (WorldEdit facade)
 - **NextGens** 1.30 (generator management)
 - **Citizens** 2.0.39 (NPC management)

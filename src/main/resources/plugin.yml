@@ -43,13 +43,12 @@ permissions:
 
 depend:
   - WorldEdit
-  - Multiverse-Core
   - Citizens
-  - VoidGen
   - DecentHolograms
   - WorldGuard
   - AxVaults
   - NextGens
+  - SlimeWorldManager
 
 softdepend:
   - PlaceholderAPI

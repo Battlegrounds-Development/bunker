@@ -8,10 +8,6 @@ import me.remag501.bunker.service.*;
 import org.bukkit.*;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.mvplugins.multiverse.core.MultiverseCoreApi;
-import org.mvplugins.multiverse.core.world.MultiverseWorld;
-import org.mvplugins.multiverse.core.world.WorldManager;
-import org.mvplugins.multiverse.core.world.options.CreateWorldOptions;
 
 import java.util.HashSet;
 import java.util.List;
@@ -76,7 +72,6 @@ public class BunkerCreationManager {
         // Update bunker config to show upgrades
         String playerName = player.getName();
         List<String> upgrades = bunkerConfig.getConfig().getStringList(playerName.toUpperCase() + ".upgrades");
-        Bukkit.getLogger().info(upgrades.toString());
         if (!upgrades.contains(bunkerLevel)) {
             upgrades.add(bunkerLevel);
             bunkerConfig.getConfig().set(playerName.toUpperCase() + ".upgrades", upgrades);
@@ -174,14 +169,9 @@ public class BunkerCreationManager {
             return;
         }
 
-        boolean createdWithAsp = tryCreateAspWorld(worldName, templateWorldName);
-        if (!createdWithAsp && !createLegacyWorld(worldName)) {
+        if (!tryCreateAspWorld(worldName, templateWorldName)) {
+            logger.severe("ASP bunker world creation failed for '" + worldName + "'. No legacy backend fallback remains.");
             return;
-        }
-        final boolean applyBaseSchematics = !createdWithAsp;
-
-        if (!createdWithAsp) {
-            logger.info("Falling back to legacy Multiverse/VoidGen creation for " + worldName);
         }
 
         // 2. Wait for the world to be loaded using TaskService
@@ -191,7 +181,7 @@ public class BunkerCreationManager {
             World world = Bukkit.getWorld(worldName);
 
             if (world != null) {
-                setupWorldContent(world, bunkerInstance, applyBaseSchematics);
+                setupWorldContent(world, bunkerInstance);
                 return true; // Stop the task
             }
 
@@ -215,44 +205,16 @@ public class BunkerCreationManager {
                 return false;
             }
 
-            var clonedWorld = templateWorld.getSerializableCopy().clone(worldName);
-            api.loadWorld(clonedWorld, false);
-            return true;
+            var clonedWorld = templateWorld.clone(worldName);
+            return api.loadWorld(clonedWorld, false) != null;
         } catch (Throwable t) {
             logger.warning("ASP bunker world creation failed for '" + worldName + "': " + t.getMessage());
             return false;
         }
     }
 
-    private boolean createLegacyWorld(String worldName) {
-        MultiverseCoreApi mvApi = MultiverseCoreApi.get();
-        WorldManager worldManager = mvApi.getWorldManager();
-
-        if (worldManager.getWorld(worldName).isEmpty()) {
-            CreateWorldOptions options = CreateWorldOptions.worldName(worldName)
-                    .environment(World.Environment.NORMAL)
-                    .worldType(WorldType.FLAT)
-                    .generator("VoidGen")
-                    .generateStructures(false);
-
-            var result = worldManager.createWorld(options);
-            if (result.isFailure()) {
-                logger.severe("Multiverse failed to create " + worldName + ": " + result.getFailureReason());
-                return false;
-            }
-        }
-        return true;
-    }
-
-    public void setupWorldContent(World world, BunkerInstance bunkerInstance, boolean applyBaseSchematics) {
+    public void setupWorldContent(World world, BunkerInstance bunkerInstance) {
         String worldName = world.getName();
-        MultiverseCoreApi mvApi = MultiverseCoreApi.get();
-
-        WorldManager worldManager = mvApi.getWorldManager();
-        MultiverseWorld mvWorld = worldManager.getWorld(world).getOrNull();
-
-        // We target the spawn chunk. When this completes, the world is ticked and WorldGuard
-        // will have recognized the new world instance.
 
         Location spawn = world.getSpawnLocation();
         int chunkX = spawn.getBlockX() >> 4;
@@ -262,39 +224,30 @@ public class BunkerCreationManager {
         world.setChunkForceLoaded(chunkX, chunkZ, true);
 
         // Use the standard getChunkAtAsync with a small delay
-        world.getChunkAtAsync(spawn).thenAccept(chunk -> {
-            taskService.delay(1, () -> { // Give it 1 tick to stabilize
+        world.getChunkAtAsync(spawn).thenAccept(chunk -> taskService.delay(1, () -> {
+            // 1. Apply settings first
+            applyWorldSettings(world);
 
-                // 1. Apply settings first
-                applyWorldSettings(world, mvWorld);
+            schematicService.addSchematic(bunkerInstance, worldName);
 
-                if (applyBaseSchematics) {
-                    schematicService.addSchematic(bunkerInstance, worldName);
-                }
+            // 2. WorldGuard Phase
+            worldGuardService.setupBunkerFlags(world);
 
-                // 2. WorldGuard Phase
-                worldGuardService.setupBunkerFlags(world);
+            // 3. Citizens/Hologram Phase
+            npcService.addNPC(worldName, bunkerInstance);
+            hologramService.addHologram(bunkerInstance, world);
 
-                // 3. Citizens/Hologram Phase
-                npcService.addNPC(worldName, bunkerInstance);
-                hologramService.addHologram(bunkerInstance, world);
+            // 4. Cleanup: Unforce the chunk so we don't leak memory with 100 worlds
+            world.setChunkForceLoaded(chunkX, chunkZ, false);
 
-                // 4. Cleanup: Unforce the chunk so we don't leak memory with 100 worlds
-                world.setChunkForceLoaded(chunkX, chunkZ, false);
-
-                logger.info("Successfully initialized all systems for " + worldName);
-            });
-        });
+            logger.info("Successfully initialized all systems for " + worldName);
+        }));
     }
 
-    private void applyWorldSettings(World world, MultiverseWorld mvWorld) {
+    private void applyWorldSettings(World world) {
         Location newSpawn = bunkerConfigManager.getSpawnLocation();
-        if (mvWorld != null) {
-            mvWorld.setAdjustSpawn(false);
-            mvWorld.setSpawnLocation(newSpawn);
-            mvWorld.setDifficulty(Difficulty.PEACEFUL);
-        }
         world.setSpawnLocation(newSpawn);
+        world.setDifficulty(Difficulty.PEACEFUL);
         world.setGameRule(GameRule.DO_MOB_SPAWNING, false);
         world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
         world.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
