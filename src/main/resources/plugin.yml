@@ -48,7 +48,7 @@ depend:
   - WorldGuard
   - AxVaults
   - NextGens
-  - SlimeWorldManager
+  - ASPaperPlugin
 
 softdepend:
   - PlaceholderAPI

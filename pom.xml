@@ -73,7 +73,7 @@
         </repository>
         <repository>
             <id>enginehub-maven</id>
-                <url>https://maven.enginehub.org/repo/</url>
+            <url>https://maven.enginehub.org/repo/</url>
         </repository>
         <repository>
             <id>citizens-repo</id>
@@ -117,6 +117,12 @@
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
             <version>1.21.8-R0.1-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.infernalsuite.asp</groupId>
+            <artifactId>loaders</artifactId>
+            <version>4.1.0</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

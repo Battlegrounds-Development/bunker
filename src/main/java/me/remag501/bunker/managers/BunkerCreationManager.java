@@ -1,6 +1,7 @@
 package me.remag501.bunker.managers;
 
 import com.infernalsuite.asp.api.AdvancedSlimePaperAPI;
+import com.infernalsuite.asp.loaders.file.FileLoader;
 import me.remag501.core.api.task.TaskService;
 import me.remag501.bunker.BunkerPlugin;
 import me.remag501.bunker.core.BunkerInstance;
@@ -8,7 +9,10 @@ import me.remag501.bunker.service.*;
 import org.bukkit.*;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -26,6 +30,7 @@ public class BunkerCreationManager {
     private final NPCService npcService;
     private final SchematicService schematicService;
     private final WorldGuardService worldGuardService;
+    private final AdvancedSlimePaperAPI api;
 
     private final Set<UUID> runningTasks = new HashSet<>();
 
@@ -40,6 +45,7 @@ public class BunkerCreationManager {
         this.npcService = npcService;
         this.schematicService = schematicService;
         this.worldGuardService = worldGuardService;
+        this.api = AdvancedSlimePaperAPI.instance();
     }
 
     // ---------------- Bunker Assignment & Config Access ----------------
@@ -182,6 +188,7 @@ public class BunkerCreationManager {
 
             if (world != null) {
                 setupWorldContent(world, bunkerInstance);
+//                Bukkit.unloadWorld(world, true); // Unload using bukkit because ASP listens to events and will handle cleanup
                 return true; // Stop the task
             }
 
@@ -198,19 +205,42 @@ public class BunkerCreationManager {
 
     private boolean tryCreateAspWorld(String worldName, String templateWorldName) {
         try {
-            AdvancedSlimePaperAPI api = AdvancedSlimePaperAPI.instance();
             var templateWorld = api.getLoadedWorld(templateWorldName);
+
             if (templateWorld == null) {
                 logger.warning("ASP template world '" + templateWorldName + "' is not loaded.");
                 return false;
             }
 
-            var clonedWorld = templateWorld.clone(worldName);
-            return api.loadWorld(clonedWorld, false) != null;
+            var loader = new FileLoader(new File(getDataFolder(), "slime_worlds"));
+            var clonedWorld = templateWorld.clone(worldName, loader);
+
+            var instance = api.loadWorld(clonedWorld, true);
+            if (instance == null) {
+                logger.warning("ASP failed to load cloned world: " + worldName);
+                return false;
+            }
+
+            taskService.delay(1, () -> {
+                // IO operations must be done asynchronously to avoid blocking the main thread
+                try {
+                    api.saveWorld(clonedWorld);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+            return true;
         } catch (Throwable t) {
             logger.warning("ASP bunker world creation failed for '" + worldName + "': " + t.getMessage());
             return false;
         }
+    }
+
+    private File getDataFolder() {
+//        return new File("bunker_worlds");
+        Plugin plugin = Bukkit.getPluginManager().getPlugin("BGSBunker");
+        return plugin.getDataFolder();
     }
 
     public void setupWorldContent(World world, BunkerInstance bunkerInstance) {
