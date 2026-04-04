@@ -16,7 +16,9 @@ import org.bukkit.plugin.Plugin;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class BunkerWorldLifecycleService {
@@ -28,6 +30,7 @@ public class BunkerWorldLifecycleService {
     private final BunkerConfigManager bunkerConfigManager;
     private final AdvancedSlimePaperAPI api;
     private final FileLoader loader;
+    private final Set<String> runtimeBootstrappedWorlds = ConcurrentHashMap.newKeySet();
 
     public BunkerWorldLifecycleService(Plugin plugin, TaskService taskService, BunkerConfigManager bunkerConfigManager) {
         this.plugin = plugin;
@@ -71,6 +74,25 @@ public class BunkerWorldLifecycleService {
         });
     }
 
+    public void executeWhenWorldReady(String worldName, Consumer<World> bootstrap, Consumer<World> onReady, Runnable onFailure) {
+        executeWhenWorldLoaded(worldName, world -> {
+            String key = world.getName().toLowerCase();
+
+            if (!runtimeBootstrappedWorlds.contains(key)) {
+                try {
+                    bootstrap.accept(world);
+                    runtimeBootstrappedWorlds.add(key);
+                } catch (Exception ex) {
+                    plugin.getLogger().warning("Failed runtime bootstrap for world '" + world.getName() + "': " + ex.getMessage());
+                    onFailure.run();
+                    return;
+                }
+            }
+
+            onReady.accept(world);
+        }, onFailure);
+    }
+
     public void scheduleUnloadCheck(String worldName) {
         if (!shouldManageWorld(worldName)) {
             return;
@@ -91,6 +113,7 @@ public class BunkerWorldLifecycleService {
 
         boolean unloaded = Bukkit.unloadWorld(world, true);
         if (unloaded) {
+            runtimeBootstrappedWorlds.remove(worldName.toLowerCase());
             plugin.getLogger().info("Unloaded idle slime world: " + worldName);
         }
     }

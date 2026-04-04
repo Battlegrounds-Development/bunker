@@ -14,6 +14,7 @@ import org.bukkit.plugin.Plugin;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -156,6 +157,77 @@ public class BunkerCreationManager {
         }
 
         return worldNames;
+    }
+
+    public UUID getOwnerByWorldName(String worldName) {
+        String normalizedTarget = normalizeStoredWorldName(worldName);
+        if (normalizedTarget == null || normalizedTarget.isBlank()) {
+            return null;
+        }
+
+        for (String key : bunkerConfig.getConfig().getKeys(false)) {
+            if (key.equalsIgnoreCase("totalBunkers") || key.equalsIgnoreCase("assignedBunkers")) {
+                continue;
+            }
+
+            String storedWorld = bunkerConfig.getConfig().getString(key + ".world");
+            String normalizedStoredWorld = normalizeStoredWorldName(storedWorld);
+            if (normalizedStoredWorld == null) {
+                continue;
+            }
+
+            if (normalizedStoredWorld.equalsIgnoreCase(normalizedTarget)) {
+                try {
+                    return UUID.fromString(key);
+                } catch (IllegalArgumentException ignored) {
+                    // Ignore malformed keys; runtime config should be UUID-only now.
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public void bootstrapRuntimeSystems(World world) {
+        UUID ownerId = getOwnerByWorldName(world.getName());
+        if (ownerId == null) {
+            logger.warning("Could not resolve bunker owner for runtime bootstrap in world: " + world.getName());
+            return;
+        }
+
+        bootstrapRuntimeSystems(world, ownerId);
+    }
+
+    public void bootstrapRuntimeSystems(World world, UUID ownerId) {
+        applyWorldSettings(world);
+
+        Set<String> levels = getAppliedLevels(ownerId);
+        if (levels.isEmpty()) {
+            levels.add("main");
+        }
+
+        for (String level : levels) {
+            BunkerInstance instance = bunkerConfigManager.getBunkerInstance(level);
+            if (instance == null) {
+                logger.warning("Skipping runtime bootstrap level '" + level + "' for " + world.getName() + " (missing in config). ");
+                continue;
+            }
+
+            worldGuardService.setupBunkerFlags(world);
+            npcService.addNPC(world.getName(), instance);
+            hologramService.addHologram(instance, world);
+            generatorService.rehydrateGenerators(world, ownerId, instance);
+        }
+    }
+
+    private Set<String> getAppliedLevels(UUID ownerId) {
+        Set<String> levels = new LinkedHashSet<>();
+        levels.add("main");
+
+        String upgradesPath = getPlayerBasePath(ownerId) + ".upgrades";
+        List<String> upgrades = bunkerConfig.getConfig().getStringList(upgradesPath);
+        levels.addAll(upgrades);
+        return levels;
     }
 
     private String getPlayerBasePath(UUID playerId) {

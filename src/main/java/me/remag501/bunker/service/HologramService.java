@@ -36,9 +36,13 @@ public class HologramService {
             }
 
             String cloneName = world.getName() + "_" + templateName;
+            Hologram existingClone = DHAPI.getHologram(cloneName);
+            if (existingClone != null) {
+                existingClone.delete();
+            }
+
             Hologram clone = template.clone(cloneName, targetLocation, false);
             clone.enable();
-            clone.save();
             DecentHologramsAPI.get().getHologramManager().registerHologram(clone);
 
             logger.info("Cloned hologram '" + templateName + "' as '" + cloneName + "' at " + targetLocation);

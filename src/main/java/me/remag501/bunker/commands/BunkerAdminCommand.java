@@ -257,7 +257,8 @@ public class BunkerAdminCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        worldLifecycleService.executeWhenWorldLoaded(normalizedWorldName,
+        worldLifecycleService.executeWhenWorldReady(normalizedWorldName,
+                world -> bunkerCreationManager.bootstrapRuntimeSystems(world),
                 world -> {
                     admin.teleport(world.getSpawnLocation());
                     admin.sendMessage(ChatColor.GREEN + "Teleported to bunker world: " + normalizedWorldName);

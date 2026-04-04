@@ -49,7 +49,8 @@ public class BunkerCommand implements CommandExecutor {
                 return true;
             }
 
-            worldLifecycleService.executeWhenWorldLoaded(worldName,
+            worldLifecycleService.executeWhenWorldReady(worldName,
+                    world -> bunkerCreationManager.bootstrapRuntimeSystems(world, player.getUniqueId()),
                     world -> {
                         player.teleport(world.getSpawnLocation());
                         player.sendMessage(bunkerConfigManager.getMessage("homeMsg"));

@@ -14,6 +14,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 public class GeneratorService {
@@ -81,6 +82,11 @@ public class GeneratorService {
                 }
             });
         }
+    }
+
+    public void rehydrateGenerators(World world, UUID ownerId, BunkerInstance bunkerInstance) {
+        // Placeholder hook for slime-world runtime reloads.
+        // Intentionally left as a no-op until generator lifecycle behavior is finalized.
     }
 
 
