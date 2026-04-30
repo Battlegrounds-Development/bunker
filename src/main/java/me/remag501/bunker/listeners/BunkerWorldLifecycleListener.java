@@ -13,18 +13,18 @@ public class BunkerWorldLifecycleListener {
 
     public BunkerWorldLifecycleListener(EventService eventService, BunkerWorldLifecycleService lifecycleService) {
         eventService.subscribe(PlayerChangedWorldEvent.class)
-                .owner(BunkerPlugin.SYSTEM_ID)
-                .namespace(NAMESPACE)
+//                .owner(BunkerPlugin.SYSTEM_ID)
+//                .namespace(NAMESPACE)
                 .handler(event -> lifecycleService.scheduleUnloadCheck(event.getFrom().getName()));
 
         eventService.subscribe(PlayerQuitEvent.class)
-                .owner(BunkerPlugin.SYSTEM_ID)
-                .namespace(NAMESPACE)
+//                .owner(BunkerPlugin.SYSTEM_ID)
+//                .namespace(NAMESPACE)
                 .handler(event -> lifecycleService.scheduleUnloadCheck(event.getPlayer().getWorld().getName()));
 
         eventService.subscribe(PlayerKickEvent.class)
-                .owner(BunkerPlugin.SYSTEM_ID)
-                .namespace(NAMESPACE)
+//                .owner(BunkerPlugin.SYSTEM_ID)
+//                .namespace(NAMESPACE)
                 .handler(event -> lifecycleService.scheduleUnloadCheck(event.getPlayer().getWorld().getName()));
     }
 }

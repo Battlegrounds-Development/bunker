@@ -76,24 +76,31 @@ public class BunkerWorldLifecycleService {
 
     public void executeWhenWorldReady(String worldName, Consumer<World> bootstrap, Consumer<World> onReady, Runnable onFailure) {
         executeWhenWorldLoaded(worldName, world -> {
-            String key = world.getName().toLowerCase();
-
-            if (!runtimeBootstrappedWorlds.contains(key)) {
-                try {
-                    bootstrap.accept(world);
-                    runtimeBootstrappedWorlds.add(key);
-                } catch (Exception ex) {
-                    plugin.getLogger().warning("Failed runtime bootstrap for world '" + world.getName() + "': " + ex.getMessage());
-                    onFailure.run();
-                    return;
-                }
-            }
-
+            ensureBootstrapped(world, bootstrap, onFailure);
             onReady.accept(world);
         }, onFailure);
     }
 
+    /**
+     * Ensures a bunker world is bootstrapped exactly once, regardless of how many times this is called.
+     * Used by event handlers and command handlers to safely trigger bootstrap with deduplication.
+     */
+    public void ensureBootstrapped(World world, Consumer<World> bootstrap, Runnable onFailure) {
+        String key = world.getName().toLowerCase();
+
+        if (!runtimeBootstrappedWorlds.contains(key)) {
+            try {
+                bootstrap.accept(world);
+                runtimeBootstrappedWorlds.add(key);
+            } catch (Exception ex) {
+                plugin.getLogger().warning("Failed runtime bootstrap for world '" + world.getName() + "': " + ex.getMessage());
+                onFailure.run();
+            }
+        }
+    }
+
     public void scheduleUnloadCheck(String worldName) {
+        Bukkit.getLogger().info("Scheduling unload check for world: " + worldName);
         if (!shouldManageWorld(worldName)) {
             return;
         }

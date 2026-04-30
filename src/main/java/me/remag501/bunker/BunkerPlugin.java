@@ -59,6 +59,30 @@ public final class BunkerPlugin extends JavaPlugin {
         new GeneratorBreakListener(eventService);
         new BunkerWorldLifecycleListener(eventService, worldLifecycleService);
 
+        // Bootstrap when a bunker slime world is loaded and teardown when unloaded
+        eventService.subscribe(org.bukkit.event.world.WorldLoadEvent.class)
+//                .owner(SYSTEM_ID)
+//                .namespace("bunker-world-load")
+                .handler(event -> {
+                    var world = event.getWorld();
+                    if (world.getName().startsWith("bunker_")) {
+                        // Delegate through lifecycle service to ensure deduplication
+                        worldLifecycleService.ensureBootstrapped(world,
+                                w -> bunkerCreationManager.bootstrapRuntimeSystems(w),
+                                () -> getLogger().warning("Failed to bootstrap world: " + world.getName()));
+                    }
+                });
+
+        eventService.subscribe(org.bukkit.event.world.WorldUnloadEvent.class)
+//                .owner(SYSTEM_ID)
+//                .namespace("bunker-world-unload")
+                .handler(event -> {
+                    var world = event.getWorld();
+                    if (world.getName().startsWith("bunker_")) {
+                        bunkerCreationManager.teardownRuntimeSystems(world);
+                    }
+                });
+
         // Setup commands
         BunkerCommand command = new BunkerCommand(this, bunkerConfigManager, bunkerCreationManager, worldLifecycleService);
         getCommand("bunker").setExecutor(command);

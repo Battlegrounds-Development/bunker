@@ -10,6 +10,7 @@ import org.bukkit.World;
 
 import java.util.List;
 import java.util.logging.Logger;
+import java.util.Objects;
 
 public class HologramService {
 
@@ -19,6 +20,9 @@ public class HologramService {
         this.logger = logger;
     }
 
+    /**
+     * Bootstrap holograms for a world session. Clones templates into world-specific names.
+     */
     public void addHologram(BunkerInstance bunkerInstance, World world) {
         List<BunkerInstance.HologramInfo> holograms = bunkerInstance.getHolograms();
         if (holograms == null || holograms.isEmpty()) return;
@@ -41,9 +45,8 @@ public class HologramService {
                 existingClone.delete();
             }
 
-            Hologram clone = template.clone(cloneName, targetLocation, false);
+            Hologram clone = template.clone(cloneName, targetLocation, true);
             clone.enable();
-            DecentHologramsAPI.get().getHologramManager().registerHologram(clone);
 
             logger.info("Cloned hologram '" + templateName + "' as '" + cloneName + "' at " + targetLocation);
         }
@@ -58,6 +61,24 @@ public class HologramService {
         hologram.delete();
     }
 
+    /**
+     * Remove all hologram clones created for this world's session.
+     */
+    public void removeAllHolograms(BunkerInstance bunkerInstance, String worldName) {
+        List<BunkerInstance.HologramInfo> holograms = bunkerInstance.getHolograms();
+        if (holograms == null || holograms.isEmpty()) return;
+
+        for (BunkerInstance.HologramInfo info : holograms) {
+            String cloneName = worldName + "_" + info.name;
+            try {
+                removeHologram(cloneName);
+            } catch (Exception ex) {
+                logger.warning("Failed to remove hologram " + cloneName + ": " + ex.getMessage());
+            }
+        }
+    }
+
+    // Removes holograms that are marked for removal in the bunker instance (different from removing bootstrapped holograms on world unload)
     public void removeHolograms(BunkerInstance bunkerInstance, String worldName) {
         List<String> holograms = bunkerInstance.getRemoveHolograms();
         for (String hologramName: holograms) {

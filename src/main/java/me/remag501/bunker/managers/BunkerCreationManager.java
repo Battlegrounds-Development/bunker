@@ -216,10 +216,41 @@ public class BunkerCreationManager {
             worldGuardService.setupBunkerFlags(world);
             npcService.addNPC(world.getName(), instance);
             hologramService.addHologram(instance, world);
-            generatorService.rehydrateGenerators(world, ownerId, instance);
+                // generatorService.rehydrateGenerators(world, ownerId, instance);
+                // NOTE: generator rehydration is disabled until generator issues are diagnosed
         }
     }
 
+
+    /**
+     * Tear down session-based systems (NPCs, Holograms) when a bunker world is unloading.
+     */
+    public void teardownRuntimeSystems(World world) {
+        UUID ownerId = getOwnerByWorldName(world.getName());
+        if (ownerId == null) {
+            logger.warning("Could not resolve bunker owner for teardown in world: " + world.getName());
+            return;
+        }
+
+        Set<String> levels = getAppliedLevels(ownerId);
+        if (levels.isEmpty()) {
+            levels.add("main");
+        }
+
+        for (String level : levels) {
+
+            BunkerInstance instance = bunkerConfigManager.getBunkerInstance(level);
+            if (instance == null) continue;
+
+            logger.info("reaching teardown for level " + level + " in world " + world.getName());
+
+            // Remove NPC clones and hologram clones created during the session
+            npcService.removeNPCs(world.getName());
+            hologramService.removeAllHolograms(instance, world.getName());
+        }
+
+        logger.info("Teardown of runtime systems completed for " + world.getName());
+    }
     private Set<String> getAppliedLevels(UUID ownerId) {
         Set<String> levels = new LinkedHashSet<>();
         levels.add("main");
@@ -390,9 +421,9 @@ public class BunkerCreationManager {
             // 2. WorldGuard Phase
             worldGuardService.setupBunkerFlags(world);
 
-            // 3. Citizens/Hologram Phase
-            npcService.addNPC(worldName, bunkerInstance);
-            hologramService.addHologram(bunkerInstance, world);
+            // 3. Citizens/Hologram Phase (no point now since these are added on world load)
+//            npcService.addNPC(worldName, bunkerInstance);
+//            hologramService.addHologram(bunkerInstance, world);
 
             // 4. Cleanup: Unforce the chunk so we don't leak memory with 100 worlds
             world.setChunkForceLoaded(chunkX, chunkZ, false);
