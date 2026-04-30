@@ -28,7 +28,7 @@ public class BunkerCreationManager {
     private final BunkerConfigManager bunkerConfigManager;
     private final GeneratorService generatorService;
     private final HologramService hologramService;
-    private final NPCService npcService;
+    private final NpcService npcService;
     private final SchematicService schematicService;
     private final WorldGuardService worldGuardService;
     private final AdvancedSlimePaperAPI api;
@@ -36,7 +36,7 @@ public class BunkerCreationManager {
     private final Set<UUID> runningTasks = new HashSet<>();
 
     public BunkerCreationManager(TaskService taskService, Logger logger, ConfigManager bunkerConfig, BunkerConfigManager bunkerConfigManager, GeneratorService generatorService,
-                                 HologramService hologramService, NPCService npcService, SchematicService schematicService, WorldGuardService worldGuardService) {
+                                 HologramService hologramService, NpcService npcService, SchematicService schematicService, WorldGuardService worldGuardService) {
         this.taskService = taskService;
         this.logger = logger;
         this.bunkerConfig = bunkerConfig;
@@ -214,7 +214,7 @@ public class BunkerCreationManager {
             }
 
             worldGuardService.setupBunkerFlags(world);
-            npcService.addNPC(world.getName(), instance);
+            npcService.addNpc(world.getName(), instance);
             hologramService.addHologram(instance, world);
                 // generatorService.rehydrateGenerators(world, ownerId, instance);
                 // NOTE: generator rehydration is disabled until generator issues are diagnosed
@@ -245,8 +245,8 @@ public class BunkerCreationManager {
             logger.info("reaching teardown for level " + level + " in world " + world.getName());
 
             // Remove NPC clones and hologram clones created during the session
-            npcService.removeNPCs(world.getName());
-            hologramService.removeAllHolograms(instance, world.getName());
+            npcService.removeSessionNpcs(world.getName());
+            hologramService.removeSessionHolograms(instance, world.getName());
         }
 
         logger.info("Teardown of runtime systems completed for " + world.getName());
@@ -453,7 +453,7 @@ public class BunkerCreationManager {
         schematicService.addSchematic(bunkerInstance, world.getName());
 
         // Add NPC
-        npcService.addNPC(world.getName(), bunkerInstance);
+        npcService.addNpc(world.getName(), bunkerInstance);
 
         // Add generator
         generatorService.createGenerator(player, world, bunkerInstance);
@@ -462,7 +462,7 @@ public class BunkerCreationManager {
         hologramService.addHologram(bunkerInstance, world);
 
         // Remove holograms from world
-        hologramService.removeHolograms(bunkerInstance, world.getName());
+        hologramService.removeRemovalHolograms(bunkerInstance, world.getName());
 
         logger.info("Bunker in world " + world.getName() + " upgraded to level " + bunkerLevel + ".");
         return true;

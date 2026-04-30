@@ -1,6 +1,5 @@
 package me.remag501.bunker;
 
-import com.sk89q.worldguard.WorldGuard;
 import me.remag501.bunker.listeners.BunkerWorldBootstrapListener;
 import me.remag501.core.api.BGSApi;
 import me.remag501.core.api.command.CommandService;
@@ -18,7 +17,7 @@ import me.remag501.bunker.managers.ConfigManager;
 import me.remag501.bunker.service.BunkerWorldLifecycleService;
 import me.remag501.bunker.service.GeneratorService;
 import me.remag501.bunker.service.HologramService;
-import me.remag501.bunker.service.NPCService;
+import me.remag501.bunker.service.NpcService;
 import me.remag501.bunker.service.SchematicService;
 import me.remag501.bunker.service.WorldGuardService;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -45,7 +44,7 @@ public final class BunkerPlugin extends JavaPlugin {
         // Create services
         HologramService hologramService = new HologramService(getLogger());
         GeneratorService generatorService = new GeneratorService(taskService, getLogger());
-        NPCService npcService = new NPCService(taskService, getLogger());
+        NpcService npcService = new NpcService(taskService, getLogger());
         SchematicService schematicService = new SchematicService(taskService, getLogger());
         WorldGuardService worldGuardService = new WorldGuardService(getLogger());
         BunkerWorldLifecycleService worldLifecycleService = new BunkerWorldLifecycleService(this, taskService, bunkerConfigManager);

@@ -56,9 +56,7 @@ public class AdminManager {
             }
 
             // Delete all holograms in a world
-            for (BunkerInstance.HologramInfo hologramInfo : bunkerInstance.getHolograms()) {
-                hologramService.removeHologram("bunker_preview_" + hologramInfo.name);
-            }
+            hologramService.removeSessionHolograms(bunkerInstance, "bunker_preview");
 
             // No generator deletion?
 

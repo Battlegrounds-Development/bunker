@@ -1,16 +1,13 @@
 package me.remag501.bunker.service;
 
 import eu.decentsoftware.holograms.api.DHAPI;
-import eu.decentsoftware.holograms.api.DecentHologramsAPI;
 import eu.decentsoftware.holograms.api.holograms.Hologram;
 import me.remag501.bunker.core.BunkerInstance;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 
 import java.util.List;
 import java.util.logging.Logger;
-import java.util.Objects;
 
 public class HologramService {
 
@@ -52,19 +49,10 @@ public class HologramService {
         }
     }
 
-    public void removeHologram(String hologramName) {
-        Hologram hologram = DHAPI.getHologram(hologramName);
-        if (hologram == null) {
-            logger.warning("Hologram " + hologramName + " not found, cannot delete.");
-            return;
-        }
-        hologram.delete();
-    }
-
     /**
      * Remove all hologram clones created for this world's session.
      */
-    public void removeAllHolograms(BunkerInstance bunkerInstance, String worldName) {
+    public void removeSessionHolograms(BunkerInstance bunkerInstance, String worldName) {
         List<BunkerInstance.HologramInfo> holograms = bunkerInstance.getHolograms();
         if (holograms == null || holograms.isEmpty()) return;
 
@@ -78,12 +66,24 @@ public class HologramService {
         }
     }
 
-    // Removes holograms that are marked for removal in the bunker instance (different from removing bootstrapped holograms on world unload)
-    public void removeHolograms(BunkerInstance bunkerInstance, String worldName) {
+
+    /**
+     * Removes holograms that are marked for removal in the bunker instance (different from removing bootstrapped holograms on world unload)
+     */
+    public void removeRemovalHolograms(BunkerInstance bunkerInstance, String worldName) {
         List<String> holograms = bunkerInstance.getRemoveHolograms();
         for (String hologramName: holograms) {
             removeHologram(worldName + "_" + hologramName);
         }
+    }
+
+    private void removeHologram(String hologramName) {
+        Hologram hologram = DHAPI.getHologram(hologramName);
+        if (hologram == null) {
+            logger.warning("Hologram " + hologramName + " not found, cannot delete.");
+            return;
+        }
+        hologram.delete();
     }
 
 }

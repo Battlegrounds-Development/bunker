@@ -7,9 +7,7 @@ import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.npc.NPC;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.World;
-import org.bukkit.block.BlockFace;
 
 import java.util.List;
 import java.util.logging.Logger;
@@ -17,19 +15,19 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.Map;
 
-public class NPCService {
+public class NpcService {
 
     private final TaskService taskService;
     private final Logger logger;
     // Track spawned clones per-world so we can teardown on unload
     private final Map<String, List<NPC>> spawnedNpcs = new ConcurrentHashMap<>();
 
-    public NPCService(TaskService taskService, Logger logger) {
+    public NpcService(TaskService taskService, Logger logger) {
         this.taskService = taskService;
         this.logger = logger;
     }
 
-    public void addNPC(String worldName, BunkerInstance bunkerInstance) {
+    public void addNpc(String worldName, BunkerInstance bunkerInstance) {
         int[] attempts = {0};
         int maxAttempts = 100;
 
@@ -77,7 +75,7 @@ public class NPCService {
     /**
      * Remove any NPC clones that were spawned for this world during runtime bootstrap.
      */
-    public void removeNPCs(String worldName) {
+    public void removeSessionNpcs(String worldName) {
         logger.info("Removing NPCs for world: " + worldName);
         List<NPC> list = spawnedNpcs.remove(worldName);
         if (list == null || list.isEmpty()) return;
