@@ -199,12 +199,21 @@ public class BunkerCreationManager {
     }
 
     public void bootstrapRuntimeSystems(World world, UUID ownerId) {
+
         applyWorldSettings(world);
 
-        Set<String> levels = getAppliedLevels(ownerId);
-        if (levels.isEmpty()) {
+        Set<String> levels;
+        if (ownerId == null) {
+            levels = new LinkedHashSet<>();
             levels.add("main");
+        } else {
+            levels = getAppliedLevels(ownerId);
+            if (levels.isEmpty()) {
+                levels.add("main");
+            }
         }
+
+        worldGuardService.setupBunkerFlags(world);
 
         for (String level : levels) {
             BunkerInstance instance = bunkerConfigManager.getBunkerInstance(level);
@@ -213,7 +222,6 @@ public class BunkerCreationManager {
                 continue;
             }
 
-            worldGuardService.setupBunkerFlags(world);
             npcService.addNpc(world.getName(), instance);
             hologramService.addHologram(instance, world);
                 // generatorService.rehydrateGenerators(world, ownerId, instance);
@@ -226,15 +234,27 @@ public class BunkerCreationManager {
      * Tear down session-based systems (NPCs, Holograms) when a bunker world is unloading.
      */
     public void teardownRuntimeSystems(World world) {
-        UUID ownerId = getOwnerByWorldName(world.getName());
-        if (ownerId == null) {
-            logger.warning("Could not resolve bunker owner for teardown in world: " + world.getName());
-            return;
+
+        UUID ownerId;
+        if (world.getName().equalsIgnoreCase("bunker_preview")) {
+            ownerId = null;
+        } else {
+            ownerId = getOwnerByWorldName(world.getName());
+            if (ownerId == null) {
+                logger.warning("Could not resolve bunker owner for teardown in world: " + world.getName());
+                return;
+            }
         }
 
-        Set<String> levels = getAppliedLevels(ownerId);
-        if (levels.isEmpty()) {
+        Set<String> levels;
+        if (ownerId == null) {
+            levels = new LinkedHashSet<>();
             levels.add("main");
+        } else {
+            levels = getAppliedLevels(ownerId);
+            if (levels.isEmpty()) {
+                levels.add("main");
+            }
         }
 
         for (String level : levels) {
@@ -370,7 +390,12 @@ public class BunkerCreationManager {
                 return false;
             }
 
-            var loader = new FileLoader(new File(getDataFolder(), "slime_worlds"));
+            boolean isPreview = worldName.equalsIgnoreCase("bunker_preview");
+
+            var loader = isPreview
+                    ? null // No loader for preview
+                    : new FileLoader(new File(getDataFolder(), "slime_worlds"));
+
             var clonedWorld = templateWorld.clone(worldName, loader);
 
             var instance = api.loadWorld(clonedWorld, true);
@@ -379,14 +404,15 @@ public class BunkerCreationManager {
                 return false;
             }
 
-            taskService.delay(1, () -> {
-                // IO operations must be done asynchronously to avoid blocking the main thread
-                try {
-                    api.saveWorld(clonedWorld);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            });
+            if (!isPreview) {
+                taskService.delay(1, () -> {
+                    try {
+                        api.saveWorld(clonedWorld);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+            }
 
             return true;
         } catch (Throwable t) {

@@ -53,7 +53,8 @@ public class BunkerWorldLifecycleService {
             return;
         }
 
-        if (!loadSlimeWorld(worldName)) {
+        boolean isPreview = worldName != null && worldName.equalsIgnoreCase("bunker_preview");
+        if (!isPreview && !loadSlimeWorld(worldName)) {
             onFailure.run();
             return;
         }

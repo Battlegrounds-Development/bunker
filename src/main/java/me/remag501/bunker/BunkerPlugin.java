@@ -52,7 +52,7 @@ public final class BunkerPlugin extends JavaPlugin {
         // Create managers
         BunkerCreationManager bunkerCreationManager = new BunkerCreationManager(taskService, getLogger(), configManager,
                 bunkerConfigManager, generatorService, hologramService, npcService, schematicService, worldGuardService);
-        AdminManager adminManager = new AdminManager(this, bunkerCreationManager, hologramService, generatorService);
+        AdminManager adminManager = new AdminManager(this, bunkerCreationManager, hologramService, generatorService, worldLifecycleService);
 
         // Register listeners
         new OpenContainer(eventService);
