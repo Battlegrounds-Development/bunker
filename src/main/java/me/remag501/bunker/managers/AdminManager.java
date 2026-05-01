@@ -1,6 +1,8 @@
 package me.remag501.bunker.managers;
 
+import com.infernalsuite.asp.api.AdvancedSlimePaperAPI;
 import me.remag501.bunker.core.BunkerInstance;
+import me.remag501.bunker.service.BunkerWorldLifecycleService;
 import me.remag501.bunker.service.GeneratorService;
 import me.remag501.bunker.service.HologramService;
 import net.citizensnpcs.api.CitizensAPI;
@@ -13,10 +15,6 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
-import org.mvplugins.multiverse.core.MultiverseCoreApi;
-import org.mvplugins.multiverse.core.world.MultiverseWorld;
-import org.mvplugins.multiverse.core.world.WorldManager;
-import org.mvplugins.multiverse.core.world.options.DeleteWorldOptions;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,12 +25,14 @@ public class AdminManager {
     private final BunkerCreationManager bunkerCreationManager;
     private final HologramService hologramService;
     private final GeneratorService generatorService;
+    private final BunkerWorldLifecycleService worldLifecycleService;
 
-    public AdminManager(Plugin plugin, BunkerCreationManager bunkerCreationManager, HologramService hologramService, GeneratorService generatorService) {
+    public AdminManager(Plugin plugin, BunkerCreationManager bunkerCreationManager, HologramService hologramService, GeneratorService generatorService, BunkerWorldLifecycleService worldLifecycleService) {
         this.plugin = plugin;
         this.bunkerCreationManager = bunkerCreationManager;
         this.hologramService = hologramService;
         this.generatorService = generatorService;
+        this.worldLifecycleService = worldLifecycleService;
     }
 
     public void previewBunker(Player player) {
@@ -41,84 +41,67 @@ public class AdminManager {
         BunkerInstance bunkerInstance = bunkerCreationManager.getConfigManger().getBunkerInstance("main");
 
         if (previewWorld != null) {
-
-            // Prepare to delete any npcs in the world
-            NPCRegistry registry = CitizensAPI.getNPCRegistry();
-            List<NPC> toRemove = new ArrayList<>();
-
-            // First collect NPCs to delete
-            for (NPC npc : registry) {
-                if (npc.isSpawned() && npc.getEntity().getWorld().equals(previewWorld)) {
-                    toRemove.add(npc);
-                }
-            }
-            // Then despawn and destroy them
-            for (NPC npc : toRemove) {
-                npc.despawn();
-                npc.destroy();
-            }
-
-            // Delete all holograms in a world
-            for (BunkerInstance.HologramInfo hologramInfo : bunkerInstance.getHolograms()) {
-                hologramService.removeHologram("bunker_preview" + hologramInfo.name);
-            }
-
-            // No generator deletion?
-
-            // World deletion
-            MultiverseCoreApi mvApi = MultiverseCoreApi.get();
-            WorldManager worldManager = mvApi.getWorldManager();
-            String worldName = "bunker_preview";
-
-            // 1. Get the Option
-            var worldOption = worldManager.getWorld(worldName);
-
-            // 2. Use isPresent() to check
-            if (worldOption.isDefined()) {
-                // 3. Extract the MultiverseWorld and pass it to the builder
-                MultiverseWorld mvWorld = worldOption.get();
-
-                DeleteWorldOptions options = DeleteWorldOptions.
-                        world(mvWorld);
-
-                var result = worldManager.deleteWorld(options);
-
-                if (result.isSuccess()) {
-                    player.sendMessage(ChatColor.GRAY + "Deleted old preview world...");
-                }
-            }
-
-            player.sendMessage(ChatColor.GRAY + "Deleted old preview world...");
+            removeNpcAndHologramFromWorld(bunkerInstance, previewWorld);
+            deletePreviewWorld(previewWorld, player);
         }
 
         // Create the new preview world asynchronously then teleport player when done
-        new BukkitRunnable() {
-            boolean complete = false;
+        bunkerCreationManager.createBunkerWorld("bunker_preview");
 
-            @Override
-            public void run() {
-                if (complete) {
-                    World newWorld = Bukkit.getWorld("bunker_preview");
-                    if (newWorld != null) {
-                        // Add generators in player name
-                        generatorService.createGenerator(player, newWorld, bunkerInstance);
+        // Bootstrap preview world and teleport player when ready
+        worldLifecycleService.executeWhenWorldReady("bunker_preview",
+                world -> bunkerCreationManager.bootstrapRuntimeSystems(world, null),
+                world -> {
+                    generatorService.createGenerator(player, world, bunkerInstance);
+                    player.teleport(world.getSpawnLocation());
+                    player.sendMessage(ChatColor.GREEN + "Teleported to preview bunker.");
+                },
+                () -> player.sendMessage(ChatColor.RED + "Preview bunker world not found."));
 
-                        // Teleport player
-                        Location spawn = newWorld.getSpawnLocation();
-                        player.teleport(spawn);
-                        player.sendMessage(ChatColor.GREEN + "Teleported to preview bunker.");
-                    } else {
-                        player.sendMessage(ChatColor.RED + "Preview bunker world not found.");
-                    }
-                    cancel();
-                    return;
-                }
+    }
 
-                // Create the new preview world
-                bunkerCreationManager.createBunkerWorld("bunker_preview");
-                complete = true;
+    private void deletePreviewWorld(World previewWorld, Player player) {
+        String worldName = previewWorld.getName();
+
+        try {
+            var slimeWorld = AdvancedSlimePaperAPI.instance().getLoadedWorld(worldName);
+            if (slimeWorld != null) {
+                Bukkit.unloadWorld(previewWorld, false);
+                slimeWorld.getLoader().deleteWorld(worldName);
+                player.sendMessage(ChatColor.GRAY + "Deleted old preview world...");
+                return;
             }
-        }.runTaskTimer(plugin, 0L, 0L);
+        } catch (Throwable t) {
+            plugin.getLogger().warning("ASP preview delete failed for " + worldName + ": " + t.getMessage());
+        }
+
+
+        player.sendMessage(ChatColor.GRAY + "Deleted old preview world...");
+    }
+
+    private void removeNpcAndHologramFromWorld(BunkerInstance bunkerInstance, World previewWorld) {
+
+        // Prepare to delete any npcs in the world
+        NPCRegistry registry = CitizensAPI.getNPCRegistry();
+        List<NPC> toRemove = new ArrayList<>();
+
+        // First collect NPCs to delete
+        for (NPC npc : registry) {
+            if (npc.isSpawned() && npc.getEntity().getWorld().equals(previewWorld)) {
+                toRemove.add(npc);
+            }
+        }
+        // Then despawn and destroy them
+        for (NPC npc : toRemove) {
+            npc.despawn();
+            npc.destroy();
+        }
+
+        // Delete all holograms in a world
+        hologramService.removeSessionHolograms(bunkerInstance, "bunker_preview");
+
+        // No generator deletion?
+
     }
 
 }

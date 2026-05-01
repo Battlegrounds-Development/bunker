@@ -1,5 +1,7 @@
 package me.remag501.bunker.managers;
 
+import com.infernalsuite.asp.api.AdvancedSlimePaperAPI;
+import com.infernalsuite.asp.loaders.file.FileLoader;
 import me.remag501.core.api.task.TaskService;
 import me.remag501.bunker.BunkerPlugin;
 import me.remag501.bunker.core.BunkerInstance;
@@ -7,12 +9,12 @@ import me.remag501.bunker.service.*;
 import org.bukkit.*;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.mvplugins.multiverse.core.MultiverseCoreApi;
-import org.mvplugins.multiverse.core.world.MultiverseWorld;
-import org.mvplugins.multiverse.core.world.WorldManager;
-import org.mvplugins.multiverse.core.world.options.CreateWorldOptions;
+import org.bukkit.plugin.Plugin;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -26,14 +28,15 @@ public class BunkerCreationManager {
     private final BunkerConfigManager bunkerConfigManager;
     private final GeneratorService generatorService;
     private final HologramService hologramService;
-    private final NPCService npcService;
+    private final NpcService npcService;
     private final SchematicService schematicService;
     private final WorldGuardService worldGuardService;
+    private final AdvancedSlimePaperAPI api;
 
     private final Set<UUID> runningTasks = new HashSet<>();
 
     public BunkerCreationManager(TaskService taskService, Logger logger, ConfigManager bunkerConfig, BunkerConfigManager bunkerConfigManager, GeneratorService generatorService,
-                                 HologramService hologramService, NPCService npcService, SchematicService schematicService, WorldGuardService worldGuardService) {
+                                 HologramService hologramService, NpcService npcService, SchematicService schematicService, WorldGuardService worldGuardService) {
         this.taskService = taskService;
         this.logger = logger;
         this.bunkerConfig = bunkerConfig;
@@ -43,13 +46,15 @@ public class BunkerCreationManager {
         this.npcService = npcService;
         this.schematicService = schematicService;
         this.worldGuardService = worldGuardService;
+        this.api = AdvancedSlimePaperAPI.instance();
     }
 
     // ---------------- Bunker Assignment & Config Access ----------------
 
-    public boolean hasBunker(String playerName) {
-        return bunkerConfig.getConfig().contains(playerName.toUpperCase() + ".id");
+    public boolean hasBunker(UUID playerId) {
+        return bunkerConfig.getConfig().contains(getPlayerBasePath(playerId) + ".world");
     }
+
     public void reloadBunkerConfig() {
         bunkerConfig.reload(); // reloads from disk
     }
@@ -73,45 +78,220 @@ public class BunkerCreationManager {
 
     public boolean upgradeBunker(Player player, String bunkerLevel) {
         // Update bunker config to show upgrades
-        String playerName = player.getName();
-        List<String> upgrades = bunkerConfig.getConfig().getStringList(playerName.toUpperCase() + ".upgrades");
-        Bukkit.getLogger().info(upgrades.toString());
+        UUID playerId = player.getUniqueId();
+        String upgradesPath = getPlayerBasePath(playerId) + ".upgrades";
+        List<String> upgrades = bunkerConfig.getConfig().getStringList(upgradesPath);
         if (!upgrades.contains(bunkerLevel)) {
             upgrades.add(bunkerLevel);
-            bunkerConfig.getConfig().set(playerName.toUpperCase() + ".upgrades", upgrades);
+            bunkerConfig.getConfig().set(upgradesPath, upgrades);
             bunkerConfig.save();
-        } else
+        } else {
             return false;
+        }
+
         // Get world and upgrade bunker
-        String worldName = getWorldName(playerName);
+        String worldName = getWorldName(playerId);
+        if (worldName == null || worldName.isBlank()) {
+            return false;
+        }
+
         World world = Bukkit.getWorld(worldName);
+        if (world == null) {
+            return false;
+        }
+
         return upgradeBunkerWorld(world, bunkerLevel, player);
     }
 
-    public boolean assignBunker(String playerName) {
+    public boolean assignBunker(Player player) {
+        UUID playerId = player.getUniqueId();
+
         // Check if own bunker or if enough exists
-        if (hasBunker(playerName)) return false;
-        // Enough should exist
+        if (hasBunker(playerId)) {
+            return false;
+        }
+
         int assigned = getAssignedBunkers();
         int total = getTotalBunkers();
-//        Bukkit.getPlayer(playerName).sendMessage("reached " + assigned + " " + total);
-        if (assigned >= total) return false;
+        if (assigned >= total) {
+            return false;
+        }
+
+        String worldName = "bunker_" + assigned;
 
         // Update the config
         bunkerConfig.getConfig().set("assignedBunkers", assigned + 1);
-        bunkerConfig.getConfig().set(playerName.toUpperCase() + ".id", assigned);
+        bunkerConfig.getConfig().set(getPlayerBasePath(playerId) + ".world", worldName + ".slime");
         bunkerConfig.save();
 
         // Add generators to bunker (needs to belong to player)
         BunkerInstance bunkerInstance = bunkerConfigManager.getBunkerInstance("main");
-        World world = Bukkit.getWorld(getWorldName(playerName));
-        generatorService.createGenerator(Bukkit.getPlayer(playerName), world, bunkerInstance);
+        World world = Bukkit.getWorld(worldName);
+        generatorService.createGenerator(player, world, bunkerInstance);
 
         return true;
     }
 
-    public String getWorldName(String playerName) {
-        return "bunker_" + bunkerConfig.getConfig().getString(playerName.toUpperCase()+".id");
+    public String getWorldName(UUID playerId) {
+        String storedWorldName = bunkerConfig.getConfig().getString(getPlayerBasePath(playerId) + ".world");
+        return normalizeStoredWorldName(storedWorldName);
+    }
+
+    public List<String> getKnownBunkerWorldNames() {
+        List<String> worldNames = new java.util.ArrayList<>();
+
+        for (String key : bunkerConfig.getConfig().getKeys(false)) {
+            if (key.equalsIgnoreCase("totalBunkers") || key.equalsIgnoreCase("assignedBunkers")) {
+                continue;
+            }
+
+            String worldName = bunkerConfig.getConfig().getString(key + ".world");
+            if (worldName == null || worldName.isBlank()) {
+                continue;
+            }
+
+            String normalized = normalizeStoredWorldName(worldName);
+            if (normalized != null && !normalized.isBlank() && !worldNames.contains(normalized)) {
+                worldNames.add(normalized);
+            }
+        }
+
+        return worldNames;
+    }
+
+    public UUID getOwnerByWorldName(String worldName) {
+        String normalizedTarget = normalizeStoredWorldName(worldName);
+        if (normalizedTarget == null || normalizedTarget.isBlank()) {
+            return null;
+        }
+
+        for (String key : bunkerConfig.getConfig().getKeys(false)) {
+            if (key.equalsIgnoreCase("totalBunkers") || key.equalsIgnoreCase("assignedBunkers")) {
+                continue;
+            }
+
+            String storedWorld = bunkerConfig.getConfig().getString(key + ".world");
+            String normalizedStoredWorld = normalizeStoredWorldName(storedWorld);
+            if (normalizedStoredWorld == null) {
+                continue;
+            }
+
+            if (normalizedStoredWorld.equalsIgnoreCase(normalizedTarget)) {
+                try {
+                    return UUID.fromString(key);
+                } catch (IllegalArgumentException ignored) {
+                    // Ignore malformed keys; runtime config should be UUID-only now.
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public void bootstrapRuntimeSystems(World world) {
+        UUID ownerId = getOwnerByWorldName(world.getName());
+        if (ownerId == null) {
+            logger.warning("Could not resolve bunker owner for runtime bootstrap in world: " + world.getName());
+            return;
+        }
+
+        bootstrapRuntimeSystems(world, ownerId);
+    }
+
+    public void bootstrapRuntimeSystems(World world, UUID ownerId) {
+
+        applyWorldSettings(world);
+
+        Set<String> levels;
+        if (ownerId == null) {
+            levels = new LinkedHashSet<>();
+            levels.add("main");
+        } else {
+            levels = getAppliedLevels(ownerId);
+            if (levels.isEmpty()) {
+                levels.add("main");
+            }
+        }
+
+        worldGuardService.setupBunkerFlags(world);
+
+        for (String level : levels) {
+            BunkerInstance instance = bunkerConfigManager.getBunkerInstance(level);
+            if (instance == null) {
+                logger.warning("Skipping runtime bootstrap level '" + level + "' for " + world.getName() + " (missing in config). ");
+                continue;
+            }
+
+            npcService.addNpc(world.getName(), instance);
+            hologramService.addHologram(instance, world);
+                // generatorService.rehydrateGenerators(world, ownerId, instance);
+                // NOTE: generator rehydration is disabled until generator issues are diagnosed
+        }
+    }
+
+
+    /**
+     * Tear down session-based systems (NPCs, Holograms) when a bunker world is unloading.
+     */
+    public void teardownRuntimeSystems(World world) {
+
+        UUID ownerId;
+        if (world.getName().equalsIgnoreCase("bunker_preview")) {
+            ownerId = null;
+        } else {
+            ownerId = getOwnerByWorldName(world.getName());
+            if (ownerId == null) {
+                logger.warning("Could not resolve bunker owner for teardown in world: " + world.getName());
+                return;
+            }
+        }
+
+        Set<String> levels;
+        if (ownerId == null) {
+            levels = new LinkedHashSet<>();
+            levels.add("main");
+        } else {
+            levels = getAppliedLevels(ownerId);
+            if (levels.isEmpty()) {
+                levels.add("main");
+            }
+        }
+
+        for (String level : levels) {
+
+            BunkerInstance instance = bunkerConfigManager.getBunkerInstance(level);
+            if (instance == null) continue;
+
+            logger.info("reaching teardown for level " + level + " in world " + world.getName());
+
+            // Remove NPC clones and hologram clones created during the session
+            npcService.removeSessionNpcs(world.getName());
+            hologramService.removeSessionHolograms(instance, world.getName());
+        }
+
+        logger.info("Teardown of runtime systems completed for " + world.getName());
+    }
+    private Set<String> getAppliedLevels(UUID ownerId) {
+        Set<String> levels = new LinkedHashSet<>();
+        levels.add("main");
+
+        String upgradesPath = getPlayerBasePath(ownerId) + ".upgrades";
+        List<String> upgrades = bunkerConfig.getConfig().getStringList(upgradesPath);
+        levels.addAll(upgrades);
+        return levels;
+    }
+
+    private String getPlayerBasePath(UUID playerId) {
+        return playerId.toString();
+    }
+
+    private String normalizeStoredWorldName(String storedWorldName) {
+        if (storedWorldName == null || storedWorldName.isBlank()) {
+            return null;
+        }
+        return storedWorldName.endsWith(".slime")
+                ? storedWorldName.substring(0, storedWorldName.length() - 6)
+                : storedWorldName;
     }
 
     // ---------------- Bunker World Creation ----------------
@@ -165,24 +345,17 @@ public class BunkerCreationManager {
     public void createBunkerWorld(String worldName) {
         logger.info("Initializing creation for: " + worldName);
         BunkerInstance bunkerInstance = bunkerConfigManager.getBunkerInstance("main");
+        String templateWorldName = bunkerConfigManager.getTemplateWorldName();
+        logger.info("Using template world: " + templateWorldName);
 
-        MultiverseCoreApi mvApi = MultiverseCoreApi.get();
-        WorldManager worldManager = mvApi.getWorldManager();
+        if (templateWorldName == null || templateWorldName.isBlank()) {
+            logger.severe("Config key 'templateWorldName' is missing or empty. Cannot clone bunker world: " + worldName);
+            return;
+        }
 
-        // 1. Create the world if it doesn't exist
-        if (worldManager.getWorld(worldName).isEmpty()) {
-            CreateWorldOptions options = CreateWorldOptions.worldName(worldName)
-                    .environment(World.Environment.NORMAL)
-                    .worldType(WorldType.FLAT)
-                    .generator("VoidGen")
-                    .generateStructures(false);
-
-            var result = worldManager.createWorld(options);
-
-            if (result.isFailure()) {
-                logger.severe("Multiverse failed to create " + worldName + ": " + result.getFailureReason());
-                return;
-            }
+        if (!tryCreateAspWorld(worldName, templateWorldName)) {
+            logger.severe("ASP bunker world creation failed for '" + worldName + "'. No legacy backend fallback remains.");
+            return;
         }
 
         // 2. Wait for the world to be loaded using TaskService
@@ -193,6 +366,7 @@ public class BunkerCreationManager {
 
             if (world != null) {
                 setupWorldContent(world, bunkerInstance);
+//                Bukkit.unloadWorld(world, true); // Unload using bukkit because ASP listens to events and will handle cleanup
                 return true; // Stop the task
             }
 
@@ -207,58 +381,87 @@ public class BunkerCreationManager {
         });
     }
 
+    private boolean tryCreateAspWorld(String worldName, String templateWorldName) {
+        try {
+            var templateWorld = api.getLoadedWorld(templateWorldName);
+
+            if (templateWorld == null) {
+                logger.warning("ASP template world '" + templateWorldName + "' is not loaded.");
+                return false;
+            }
+
+            boolean isPreview = worldName.equalsIgnoreCase("bunker_preview");
+
+            var loader = isPreview
+                    ? null // No loader for preview
+                    : new FileLoader(new File(getDataFolder(), "slime_worlds"));
+
+            var clonedWorld = templateWorld.clone(worldName, loader);
+
+            var instance = api.loadWorld(clonedWorld, true);
+            if (instance == null) {
+                logger.warning("ASP failed to load cloned world: " + worldName);
+                return false;
+            }
+
+            if (!isPreview) {
+                taskService.delay(1, () -> {
+                    try {
+                        api.saveWorld(clonedWorld);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+            }
+
+            return true;
+        } catch (Throwable t) {
+            logger.warning("ASP bunker world creation failed for '" + worldName + "': " + t.getMessage());
+            return false;
+        }
+    }
+
+    private File getDataFolder() {
+//        return new File("bunker_worlds");
+        Plugin plugin = Bukkit.getPluginManager().getPlugin("BGSBunker");
+        return plugin.getDataFolder();
+    }
+
     public void setupWorldContent(World world, BunkerInstance bunkerInstance) {
         String worldName = world.getName();
-        MultiverseCoreApi mvApi = MultiverseCoreApi.get();
-
-        WorldManager worldManager = mvApi.getWorldManager();
-        MultiverseWorld mvWorld = worldManager.getWorld(world).getOrNull();
-
-        // 1. Core Bukkit/MV Settings (Safe to do immediately)
-        applyWorldSettings(world, mvWorld);
-
-        // 2. Wait for the World to be "Ready"
-        // We target the spawn chunk. When this completes, the world is ticked and WorldGuard
-        // will have recognized the new world instance.
 
         Location spawn = world.getSpawnLocation();
         int chunkX = spawn.getBlockX() >> 4;
         int chunkZ = spawn.getBlockZ() >> 4;
 
-        // 1. Force the chunk to load and STAY loaded during setup
+        // Force the chunk to load and STAY loaded during setup
         world.setChunkForceLoaded(chunkX, chunkZ, true);
 
-        // 2. Use the standard getChunkAtAsync or simply a small delay
-        // Now that it's force-loaded, the callback WILL fire.
-        world.getChunkAtAsync(spawn).thenAccept(chunk -> {
-            taskService.delay(1, () -> { // Give it 1 tick to stabilize
+        // Use the standard getChunkAtAsync with a small delay
+        world.getChunkAtAsync(spawn).thenAccept(chunk -> taskService.delay(1, () -> {
+            // 1. Apply settings first
+            applyWorldSettings(world);
 
-                // 3. WorldGuard Phase
-                worldGuardService.setupBunkerFlags(world);
+            schematicService.addSchematic(bunkerInstance, worldName);
 
-                // 4. Schematic Phase
-                schematicService.addSchematic(bunkerInstance, worldName);
+            // 2. WorldGuard Phase
+            worldGuardService.setupBunkerFlags(world);
 
-                // 5. Citizens/Hologram Phase
-                npcService.addNPC(worldName, bunkerInstance);
-                hologramService.addHologram(bunkerInstance, world);
+            // 3. Citizens/Hologram Phase (no point now since these are added on world load)
+//            npcService.addNPC(worldName, bunkerInstance);
+//            hologramService.addHologram(bunkerInstance, world);
 
-                // 6. Cleanup: Unforce the chunk so we don't leak memory with 100 worlds
-                world.setChunkForceLoaded(chunkX, chunkZ, false);
+            // 4. Cleanup: Unforce the chunk so we don't leak memory with 100 worlds
+            world.setChunkForceLoaded(chunkX, chunkZ, false);
 
-                logger.info("Successfully initialized all systems for " + worldName);
-            });
-        });
+            logger.info("Successfully initialized all systems for " + worldName);
+        }));
     }
 
-    private void applyWorldSettings(World world, MultiverseWorld mvWorld) {
+    private void applyWorldSettings(World world) {
         Location newSpawn = bunkerConfigManager.getSpawnLocation();
-        if (mvWorld != null) {
-            mvWorld.setAdjustSpawn(false);
-            mvWorld.setSpawnLocation(newSpawn);
-            mvWorld.setDifficulty(Difficulty.PEACEFUL);
-        }
         world.setSpawnLocation(newSpawn);
+        world.setDifficulty(Difficulty.PEACEFUL);
         world.setGameRule(GameRule.DO_MOB_SPAWNING, false);
         world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
         world.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
@@ -276,7 +479,7 @@ public class BunkerCreationManager {
         schematicService.addSchematic(bunkerInstance, world.getName());
 
         // Add NPC
-        npcService.addNPC(world.getName(), bunkerInstance);
+        npcService.addNpc(world.getName(), bunkerInstance);
 
         // Add generator
         generatorService.createGenerator(player, world, bunkerInstance);
@@ -285,7 +488,7 @@ public class BunkerCreationManager {
         hologramService.addHologram(bunkerInstance, world);
 
         // Remove holograms from world
-        hologramService.removeHolograms(bunkerInstance, world.getName());
+        hologramService.removeRemovalHolograms(bunkerInstance, world.getName());
 
         logger.info("Bunker in world " + world.getName() + " upgraded to level " + bunkerLevel + ".");
         return true;

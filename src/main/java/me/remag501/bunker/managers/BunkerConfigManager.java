@@ -21,6 +21,7 @@ public class BunkerConfigManager {
     private Map<String, Double> doubles = new HashMap<>();
     private Map<String, BunkerInstance> bunkerInstances = new HashMap<>();
     private Location spawnLocation = null;
+    private String templateWorldName = "";
 
     public BunkerConfigManager(BunkerPlugin plugin) {
         this.plugin = plugin;
@@ -31,6 +32,8 @@ public class BunkerConfigManager {
         plugin.saveDefaultConfig();
         plugin.reloadConfig();
         FileConfiguration config = plugin.getConfig();
+
+        bunkerInstances.clear();
 
         // Load messages
         messages.put("argCommandUsage", config.getString("argCommandUsage"));
@@ -47,6 +50,9 @@ public class BunkerConfigManager {
         messages.put("declineRequest", config.getString("declineRequest"));
         messages.put("allowVisit", config.getString("allowVisit"));
         messages.put("declineVisit", config.getString("declineVisit"));
+
+        // Global world template used for bunker world cloning
+        templateWorldName = config.getString("templateWorldName");
 
         // Load doubles
         doubles.put("x", config.getDouble("x"));
@@ -175,6 +181,10 @@ public class BunkerConfigManager {
 
     public Location getSpawnLocation() {
         return spawnLocation;
+    }
+
+    public String getTemplateWorldName() {
+        return templateWorldName;
     }
 }
 

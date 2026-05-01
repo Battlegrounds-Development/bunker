@@ -73,7 +73,7 @@
         </repository>
         <repository>
             <id>enginehub-maven</id>
-                <url>https://maven.enginehub.org/repo/</url>
+            <url>https://maven.enginehub.org/repo/</url>
         </repository>
         <repository>
             <id>citizens-repo</id>
@@ -96,12 +96,12 @@
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
         <repository>
-            <id>mvplugins-repo</id>
-            <url>https://repo.mvplugins.org/releases/</url>
-        </repository>
-        <repository>
             <id>intellectualsites-releases</id>
             <url>https://repo.intellectualsites.com/releases/</url>
+        </repository>
+        <repository>
+            <id>is-releases</id>
+            <url>https://repo.infernalsuite.com/repository/maven-releases/</url>
         </repository>
     </repositories>
 
@@ -112,6 +112,7 @@
             <version>2.12.1</version>
             <scope>provided</scope>
         </dependency>
+
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
@@ -119,21 +120,21 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
+            <groupId>com.infernalsuite.asp</groupId>
+            <artifactId>loaders</artifactId>
+            <version>4.1.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.infernalsuite.asp</groupId>
+            <artifactId>api</artifactId>
+            <version>4.1.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
             <groupId>me.clip</groupId>
             <artifactId>placeholderapi</artifactId>
             <version>2.12.2</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mvplugins.multiverse.core</groupId>
-            <artifactId>multiverse-core</artifactId>
-            <version>5.5.2</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.local</groupId>
-            <artifactId>voidGen</artifactId>
-            <version>2.2.1</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

@@ -3,7 +3,7 @@ package me.remag501.bunker.commands;
 import me.remag501.bunker.BunkerPlugin;
 import me.remag501.bunker.managers.BunkerCreationManager;
 import me.remag501.bunker.managers.BunkerConfigManager;
-import org.bukkit.Location;
+import me.remag501.bunker.service.BunkerWorldLifecycleService;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -14,11 +14,14 @@ public class BunkerCommand implements CommandExecutor {
     private final BunkerPlugin plugin;
     private final BunkerConfigManager bunkerConfigManager;
     private final BunkerCreationManager bunkerCreationManager;
+    private final BunkerWorldLifecycleService worldLifecycleService;
 
-    public BunkerCommand(BunkerPlugin plugin, BunkerConfigManager bunkerConfigManager, BunkerCreationManager bunkerCreationManager) {
+    public BunkerCommand(BunkerPlugin plugin, BunkerConfigManager bunkerConfigManager, BunkerCreationManager bunkerCreationManager,
+                         BunkerWorldLifecycleService worldLifecycleService) {
         this.plugin = plugin;
         this.bunkerConfigManager = bunkerConfigManager;
         this.bunkerCreationManager = bunkerCreationManager;
+        this.worldLifecycleService = worldLifecycleService;
     }
 
     @Override
@@ -29,47 +32,51 @@ public class BunkerCommand implements CommandExecutor {
         }
 
         Player player = (Player) sender;
-        String playerName = player.getName();
 
         if (!player.hasPermission("bunker.use"))
             return true;
 
         if (args.length == 0 || args[0].equalsIgnoreCase("home")) {
-            // Teleport to own bunker
-            if (!bunkerCreationManager.hasBunker(playerName)) {
-                player.sendMessage(bunkerConfigManager.getMessage("noBunker"));
-                return true;
+            // Teleport to own bunker after ensuring the slime world is loaded.
+            if (!bunkerCreationManager.hasBunker(player.getUniqueId())) {
+//                player.sendMessage(bunkerConfigManager.getMessage("noBunker"));
+                bunkerCreationManager.assignBunker(player);
+//                return true;
             }
-            String worldName = bunkerCreationManager.getWorldName(playerName);
-            World bunkerWorld = plugin.getServer().getWorld(worldName);
-            if (bunkerWorld == null) {
+
+            String worldName = bunkerCreationManager.getWorldName(player.getUniqueId());
+            if (worldName == null || worldName.isBlank()) {
                 player.sendMessage("Bunker world not found!");
                 return true;
             }
-            // Teleport logic, e.g., to spawn or configured coords
-            Location loc = bunkerWorld.getSpawnLocation();
-            player.teleport(loc);
-            player.sendMessage(bunkerConfigManager.getMessage("homeMsg"));
+
+            worldLifecycleService.executeWhenWorldReady(worldName,
+                    world -> bunkerCreationManager.bootstrapRuntimeSystems(world, player.getUniqueId()),
+                    world -> {
+                        player.teleport(world.getSpawnLocation());
+                        player.sendMessage(bunkerConfigManager.getMessage("homeMsg"));
+                    },
+                    () -> player.sendMessage("Bunker world not found!"));
             return true;
         }
 
         switch (args[0].toLowerCase()) {
-            case "buy":
-                if (bunkerCreationManager.hasBunker(playerName)) {
-                    player.sendMessage(bunkerConfigManager.getMessage("alreadyOwnBunker"));
-                    return true;
-                }
-                if (bunkerCreationManager.assignBunker(playerName)) {
-                    player.sendMessage(bunkerConfigManager.getMessage("bunkerPurchased"));
-                } else {
-                    player.sendMessage(bunkerConfigManager.getMessage("outOfBunkers"));
-                }
-                return true;
+//            case "buy":
+//                if (bunkerCreationManager.hasBunker(player.getUniqueId())) {
+//                    player.sendMessage(bunkerConfigManager.getMessage("alreadyOwnBunker"));
+//                    return true;
+//                }
+//                if (bunkerCreationManager.assignBunker(player)) {
+//                    player.sendMessage(bunkerConfigManager.getMessage("bunkerPurchased"));
+//                } else {
+//                    player.sendMessage(bunkerConfigManager.getMessage("outOfBunkers"));
+//                }
+//                return true;
 
 //            case "visit":
 //                player.sendMessage("This command is temporarily removed");
 //                return true;
-
+//
 //            case "accept":
 //                if (!visitRequestManager.hasPendingRequest(player.getUniqueId())) {
 //                    player.sendMessage("You have no pending visit requests.");
@@ -107,5 +114,4 @@ public class BunkerCommand implements CommandExecutor {
                 return true;
         }
     }
-
 }

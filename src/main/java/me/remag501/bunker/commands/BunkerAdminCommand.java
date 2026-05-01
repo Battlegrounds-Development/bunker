@@ -3,28 +3,39 @@ package me.remag501.bunker.commands;
 import me.remag501.bunker.managers.AdminManager;
 import me.remag501.bunker.managers.BunkerCreationManager;
 import me.remag501.bunker.managers.BunkerConfigManager;
+import me.remag501.bunker.service.BunkerWorldLifecycleService;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
 
-public class BunkerAdminCommand implements CommandExecutor {
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+
+public class BunkerAdminCommand implements CommandExecutor, TabCompleter {
 
     private final BunkerConfigManager bunkerConfigManager;
     private final BunkerCreationManager bunkerCreationManager;
     private final AdminManager adminManager;
+    private final BunkerWorldLifecycleService worldLifecycleService;
 
-    public BunkerAdminCommand(BunkerConfigManager configManger, BunkerCreationManager bunkerCreationManager, AdminManager adminManager) {
+    public BunkerAdminCommand(BunkerConfigManager configManger, BunkerCreationManager bunkerCreationManager, AdminManager adminManager,
+                              BunkerWorldLifecycleService worldLifecycleService) {
         this.bunkerConfigManager = configManger;
         this.bunkerCreationManager = bunkerCreationManager;
         this.adminManager = adminManager;
+        this.worldLifecycleService = worldLifecycleService;
     }
 
     @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, @NotNull String[] args) {
 //        if (!(sender instanceof Player)) {
 //            sender.sendMessage("Only players can run this command.");
 //            return true;
@@ -39,7 +50,7 @@ public class BunkerAdminCommand implements CommandExecutor {
         }
 
         if (args.length == 0) {
-            sender.sendMessage(ChatColor.RED + "Usage: /bunkeradmin <add|preview|migrate|upgrade>");
+            sender.sendMessage(ChatColor.RED + "Usage: /bunkeradmin <add|preview|migrate|upgrade|tp>");
             return true;
         }
 
@@ -138,14 +149,14 @@ public class BunkerAdminCommand implements CommandExecutor {
                 }
 
                 String targetPlayer = args[1];
-                if (!bunkerCreationManager.hasBunker(targetPlayer)) {
-                    sender.sendMessage(ChatColor.RED + "Targeted player does not have a bunker!");
-                    return true;
-                }
-
                 Player player = Bukkit.getPlayer(targetPlayer);
                 if (player == null) {
                     sender.sendMessage(ChatColor.RED + "Targeted player is offline!");
+                    return true;
+                }
+
+                if (!bunkerCreationManager.hasBunker(player.getUniqueId())) {
+                    sender.sendMessage(ChatColor.RED + "Targeted player does not have a bunker!");
                     return true;
                 }
 
@@ -157,6 +168,10 @@ public class BunkerAdminCommand implements CommandExecutor {
                     sender.sendMessage(ChatColor.RED + "The upgrade " + playerLevel + " is already owned or does not exist!");
                 return true;
 
+            case "tp":
+            case "teleport":
+                return handleForceTeleport(sender, args);
+
             case "reload":
                 bunkerConfigManager.reload();
                 bunkerCreationManager.reloadBunkerConfig();
@@ -165,9 +180,123 @@ public class BunkerAdminCommand implements CommandExecutor {
                 return true;
 
             default:
-                sender.sendMessage(ChatColor.RED + "Unknown subcommand. Use add, preview, migrate, or upgrade.");
+                sender.sendMessage(ChatColor.RED + "Unknown subcommand. Use add, preview, migrate, upgrade, or tp.");
                 return true;
         }
+    }
+
+    @Override
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
+        if (args.length == 1) {
+            return filterPrefix(args[0], List.of("add", "preview", "migrate", "upgrade", "playerupgrade", "tp", "teleport", "reload"));
+        }
+
+        if (args.length == 2 && isTeleportSubcommand(args[0])) {
+            return filterPrefix(args[1], List.of("player", "world"));
+        }
+
+        if (args.length == 3 && isTeleportSubcommand(args[0])) {
+            if (args[1].equalsIgnoreCase("player")) {
+                List<String> players = Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
+                return filterPrefix(args[2], players);
+            }
+            if (args[1].equalsIgnoreCase("world")) {
+                List<String> worlds = new ArrayList<>(bunkerCreationManager.getKnownBunkerWorldNames());
+                Collections.sort(worlds);
+                return filterPrefix(args[2], worlds);
+            }
+        }
+
+        return Collections.emptyList();
+    }
+
+    private boolean handleForceTeleport(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player admin)) {
+            sender.sendMessage(ChatColor.RED + "Only players can force teleport into bunkers.");
+            return true;
+        }
+
+        if (args.length < 3) {
+            sender.sendMessage(ChatColor.RED + "Usage: /bunkeradmin tp <player|world> <name>");
+            return true;
+        }
+
+        String mode = args[1].toLowerCase(Locale.ROOT);
+        String target = args[2];
+
+        return switch (mode) {
+            case "player" -> forceTeleportToPlayerBunker(admin, target);
+            case "world" -> forceTeleportToWorld(admin, target);
+            default -> {
+                sender.sendMessage(ChatColor.RED + "Usage: /bunkeradmin tp <player|world> <name>");
+                yield true;
+            }
+        };
+    }
+
+    private boolean forceTeleportToPlayerBunker(Player admin, String playerName) {
+        var offlinePlayer = Bukkit.getOfflinePlayer(playerName);
+        if (offlinePlayer == null) {
+            senderMessage(admin, ChatColor.RED + "Targeted player is offline or unknown.");
+            return true;
+        }
+
+        if (!bunkerCreationManager.hasBunker(offlinePlayer.getUniqueId())) {
+            senderMessage(admin, ChatColor.RED + "Targeted player does not have a bunker!");
+            return true;
+        }
+
+        String worldName = bunkerCreationManager.getWorldName(offlinePlayer.getUniqueId());
+        return forceTeleportToWorld(admin, worldName);
+    }
+
+    private boolean forceTeleportToWorld(Player admin, String worldName) {
+        String normalizedWorldName = normalizeWorldName(worldName);
+        if (normalizedWorldName == null || normalizedWorldName.isBlank()) {
+            senderMessage(admin, ChatColor.RED + "Invalid world name.");
+            return true;
+        }
+
+        worldLifecycleService.executeWhenWorldReady(normalizedWorldName,
+                world -> bunkerCreationManager.bootstrapRuntimeSystems(world),
+                world -> {
+                    admin.teleport(world.getSpawnLocation());
+                    admin.sendMessage(ChatColor.GREEN + "Teleported to bunker world: " + normalizedWorldName);
+                },
+                () -> admin.sendMessage(ChatColor.RED + "Could not load bunker world: " + normalizedWorldName));
+        return true;
+    }
+
+    private boolean isTeleportSubcommand(String value) {
+        return value != null && (value.equalsIgnoreCase("tp") || value.equalsIgnoreCase("teleport"));
+    }
+
+    private String normalizeWorldName(String worldName) {
+        if (worldName == null) return null;
+        String trimmed = worldName.trim();
+        if (trimmed.endsWith(".slime")) {
+            return trimmed.substring(0, trimmed.length() - 6);
+        }
+        return trimmed;
+    }
+
+    private List<String> filterPrefix(String input, List<String> options) {
+        if (input == null || input.isBlank()) {
+            return options;
+        }
+
+        String lower = input.toLowerCase(Locale.ROOT);
+        List<String> matches = new ArrayList<>();
+        for (String option : options) {
+            if (option.toLowerCase(Locale.ROOT).startsWith(lower)) {
+                matches.add(option);
+            }
+        }
+        return matches;
+    }
+
+    private void senderMessage(Player player, String message) {
+        player.sendMessage(message);
     }
 
     public BunkerCreationManager getBunkerCreationManager() {
