@@ -10,14 +10,14 @@ public class BunkerWorldBootstrapListener {
 
     public BunkerWorldBootstrapListener(EventService eventService, BunkerWorldLifecycleService lifecycleService, BunkerCreationManager creationManager) {
         // Bootstrap bunker worlds on load with deduplication
-        eventService.subscribe(WorldLoadEvent.class)
-                .filter(event -> event.getWorld().getName().startsWith("bunker_") && !event.getWorld().getName().equals("bunker_preview"))
-                .handler(event -> {
-                    var world = event.getWorld();
-                    lifecycleService.ensureBootstrapped(world,
-                            w -> creationManager.bootstrapRuntimeSystems(w),
-                            () -> {});
-                });
+//        eventService.subscribe(WorldLoadEvent.class)
+//                .filter(event -> event.getWorld().getName().startsWith("bunker_") && !event.getWorld().getName().equals("bunker_preview"))
+//                .handler(event -> {
+//                    var world = event.getWorld();
+//                    lifecycleService.ensureBootstrapped(world,
+//                            w -> creationManager.bootstrapRuntimeSystems(w),
+//                            () -> {});
+//                });
 
         // Teardown bunker worlds on unload
         eventService.subscribe(WorldUnloadEvent.class)
