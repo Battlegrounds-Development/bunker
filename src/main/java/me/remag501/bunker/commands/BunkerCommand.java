@@ -39,8 +39,9 @@ public class BunkerCommand implements CommandExecutor {
         if (args.length == 0 || args[0].equalsIgnoreCase("home")) {
             // Teleport to own bunker after ensuring the slime world is loaded.
             if (!bunkerCreationManager.hasBunker(player.getUniqueId())) {
-                player.sendMessage(bunkerConfigManager.getMessage("noBunker"));
-                return true;
+//                player.sendMessage(bunkerConfigManager.getMessage("noBunker"));
+                bunkerCreationManager.assignBunker(player);
+//                return true;
             }
 
             String worldName = bunkerCreationManager.getWorldName(player.getUniqueId());
@@ -60,17 +61,17 @@ public class BunkerCommand implements CommandExecutor {
         }
 
         switch (args[0].toLowerCase()) {
-            case "buy":
-                if (bunkerCreationManager.hasBunker(player.getUniqueId())) {
-                    player.sendMessage(bunkerConfigManager.getMessage("alreadyOwnBunker"));
-                    return true;
-                }
-                if (bunkerCreationManager.assignBunker(player)) {
-                    player.sendMessage(bunkerConfigManager.getMessage("bunkerPurchased"));
-                } else {
-                    player.sendMessage(bunkerConfigManager.getMessage("outOfBunkers"));
-                }
-                return true;
+//            case "buy":
+//                if (bunkerCreationManager.hasBunker(player.getUniqueId())) {
+//                    player.sendMessage(bunkerConfigManager.getMessage("alreadyOwnBunker"));
+//                    return true;
+//                }
+//                if (bunkerCreationManager.assignBunker(player)) {
+//                    player.sendMessage(bunkerConfigManager.getMessage("bunkerPurchased"));
+//                } else {
+//                    player.sendMessage(bunkerConfigManager.getMessage("outOfBunkers"));
+//                }
+//                return true;
 
 //            case "visit":
 //                player.sendMessage("This command is temporarily removed");
